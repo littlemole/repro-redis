@@ -1,0 +1,9 @@
+prefix=/usr/local
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+Name: repro-redis
+Description: reactive c++ redis client wrapper with promises
+Version: 0.0.1
+Cflags: -I${includedir}
+Libs: -L${libdir} -lreproredis -lpriocpp -lhiredis -lnghttp2 -lssl -lcrypto -lpthread 
