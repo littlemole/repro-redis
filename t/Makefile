@@ -2,8 +2,8 @@ DEBUG = -g -DMOL_PROMISE_DEBUG
 release : override DEBUG = -O3
 
 LIBEVENT=$(shell pkg-config libevent_pthreads --libs)
-PKG_INC=$(shell pkg-config priocpp openssl libnghttp2 hiredis --cflags)
-PKG_LIB=$(shell pkg-config openssl libnghttp2 hiredis --libs)
+PKG_INC=$(shell pkg-config priocpp  hiredis --cflags)
+PKG_LIB=$(shell pkg-config  hiredis openssl --libs)
 
 # if not g++ we assume clang++
 DEFAULT_LIBS = -stdlib=libc++ -fcoroutines-ts  -lc++abi -std=c++14 
