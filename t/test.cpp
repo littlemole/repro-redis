@@ -203,7 +203,7 @@ TEST_F(BasicTest, Coroutine) {
 
 		reproredis::RedisPool Redis("redis://localhost:6379/", 4);
 
-		coroutine_example(Redis,result);
+		coroutine_example(Redis,result).then([](){});
 
 		theLoop().run();
 	}
