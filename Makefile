@@ -9,7 +9,8 @@ LIBINC = ./include/$(LIBNAME)
 
 PWD=$(shell pwd)
 
-CONTAINER = $(shell echo "$(LIBNAME)_$(CXX)_$(BACKEND)" | sed 's/++/pp/')
+BUILDCHAIN = make
+CONTAINER = $(shell echo "$(LIBNAME)_$(CXX)_$(BACKEND)_$(BUILDCHAIN)" | sed 's/++/pp/')
 IMAGE = littlemole/$(CONTAINER)
 
 #################################################
@@ -75,16 +76,13 @@ remove: ## remove lib from $(DESTDIR)/$(PREFIX) defaults to /usr/local
 # docker stable testing environment
 
 image: ## build docker test image
-	docker build -t $(IMAGE) . -fDockerfile  --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND)
+	docker build -t $(IMAGE) . -fDockerfile  --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND) --build-arg BUILDCHAIN=$(BUILDCHAIN)
 
 clean-image: ## rebuild the docker test image from scratch
-	docker build -t $(IMAGE) . --no-cache -fDockerfile --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND)
+	docker build -t $(IMAGE) . --no-cache -fDockerfile --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND) --build-arg BUILDCHAIN=$(BUILDCHAIN)
 		
-run: rmc image ## run the docker image, runs docker/run.sh
-	docker run --name $(CONTAINER) -d -e COMPILER=$(CXX) -v "$(PWD):/opt/workspace/$(LIBNAME)"  $(IMAGE)
-                                        
 bash: rmc image ## run the docker image and open a shell
-	docker run --name $(CONTAINER) -ti -e COMPILER=$(CXX) -v "$(PWD):/opt/workspace/$(LIBNAME)"  $(IMAGE) bash
+	docker run --name $(CONTAINER) -ti $(IMAGE) bash
 
 stop: ## stop running docker image, if any
 	-docker stop $(CONTAINER)
@@ -111,4 +109,4 @@ help:
 	@echo "available targets:"
 	@grep -E -h '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: build help rmi rmc stop bash run image clean-image release remove install test clean test-build
+.PHONY: build help rmi rmc stop bash image clean-image release remove install test clean test-build

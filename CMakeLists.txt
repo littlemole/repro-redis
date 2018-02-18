@@ -8,48 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 ############################################
-# OS support
-############################################
-
-
-IF (WIN32)
-
-	set(OSLIBS "Ws2_32" "Rpcrt4")
-
-    find_package(gtest REQUIRED)
-    find_package(openssl REQUIRED)
-	find_library(REDIS_LIBRARY NAMES libhiredis)
-	find_library(NG2HTTP_LIBRARY NAMES nghttp2)
-	find_library(LIBEVENT_LIBRARY NAMES event)
-
-	set(BUILDFLAGS "-await")
-	set(DEBUGFLAGS "-DMOL_PROMISE_DEBUG")
-
-	set(LIBS ${CRYPTONEAT_LIBRARY} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${NG2HTTP_LIBRARY} ${REDIS_LIBRARY}  )
-
- ELSEIF(UNIX)
-
-    set(OSLIBS "pthread")
-
-    find_package(PkgConfig)
-    pkg_check_modules(GTEST REQUIRED gtest)
-    pkg_check_modules(OPENSSL REQUIRED openssl)
-    pkg_check_modules(HIREDIS REQUIRED hiredis)
-    pkg_check_modules(NGHTTP2 REQUIRED libnghttp2)
-    pkg_check_modules(PRIOCPP REQUIRED priocpp)
-    pkg_check_modules(LIBEVENT REQUIRED libevent_pthreads)
-
-    set(OPENSSL_INCLUDE_DIR ${OPENSSL_INCLUDE_DIRS} ${PRIOCPP_INCLUDE_DIRS})
-	set(LIBEVENT_LIBRARY ${LIBEVENT_LIBRARIES})
-
-    set(BUILDFLAGS "${GTEST_CFLAGS_OTHER}")
-	set(DEBUGFLAGS "-g -DMOL_PROMISE_DEBUG")
-
-	set(LIBS ${PRIOCPP_LIBRARIES} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${NGHTTP2_LIBRARIES} ${HIREDIS_LIBRARIES} )
-ENDIF ()
-
-
-############################################
 # macros
 ############################################
 
@@ -65,10 +23,64 @@ macro(AddCompilerFlags target flags)
     set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${CF} )
 endmacro()
 
+
 ############################################
-# defaults
+# clang support
 ############################################
 
+set(LINKERFLAGS "")
+set(STDLIB "")
+set(FLAGS "")
+
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    set(STDLIB "c++abi")
+    set(LINKERFLAGS "-stdlib=libc++ -fcoroutines-ts  -std=c++14")
+    set(FLAGS "-stdlib=libc++ -fcoroutines-ts -D_RESUMABLE_FUNCTIONS_SUPPORTED")
+endif()
+
+set( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${LINKERFLAGS}" )
+
+
+############################################
+# OS specific dependencies
+############################################
+
+find_package(GTest REQUIRED)
+find_package(OpenSSL REQUIRED)
+
+IF (WIN32)
+
+	set(OSLIBS "Ws2_32" "Rpcrt4")
+
+	find_library(REDIS_LIBRARY NAMES libhiredis)
+	find_library(LIBEVENT_LIBRARY NAMES event)
+
+	set(BUILDFLAGS "-await ${FLAGS}")
+	set(DEBUGFLAGS "-DMOL_PROMISE_DEBUG")
+
+	set(LIBS ${CRYPTONEAT_LIBRARY} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${REDIS_LIBRARY} ${STDLIB} )
+
+ ELSEIF(UNIX)
+
+    set(OSLIBS "pthread")
+
+    find_package(PkgConfig)
+    pkg_check_modules(HIREDIS REQUIRED hiredis)
+    pkg_check_modules(PRIOCPP REQUIRED priocpp)
+    pkg_check_modules(LIBEVENT REQUIRED libevent_pthreads)
+
+	set(LIBEVENT_LIBRARY ${LIBEVENT_LIBRARIES})
+
+    set(BUILDFLAGS " ${FLAGS}")
+	set(DEBUGFLAGS "-g -DMOL_PROMISE_DEBUG")
+
+	set(LIBS ${PRIOCPP_LIBRARIES} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${HIREDIS_LIBRARIES} ${STDLIB} )
+ENDIF ()
+
+
+############################################
+# backend: libevent or boost_asio
+############################################
 
 set(BACKEND ${LIBEVENT_LIBRARY})
 
@@ -87,6 +99,7 @@ endif()
 
 include_directories(include)
 include_directories(${OPENSSL_INCLUDE_DIR})
+include_directories(${PRIOCPP_INCLUDE_DIRS})
 
 file(GLOB SOURCES "src/*.cpp")
 file(GLOB HEADERS "include/reproredis/*.h")

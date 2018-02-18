@@ -6,7 +6,8 @@ MAINTAINER me <little.mole@oha7.org>
 RUN DEBIAN_FRONTEND=noninteractive apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential g++ \
-libgtest-dev cmake git pkg-config valgrind sudo joe wget 
+libgtest-dev cmake git pkg-config valgrind sudo joe wget \
+openssl libssl-dev libevent-dev uuid-dev
 
 # clang++-5.0 dependencies
 RUN echo "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main" >> /etc/apt/sources.list
@@ -16,8 +17,6 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y \
 clang-5.0 lldb-5.0 lld-5.0 libc++-dev libc++abi-dev \
-openssl libssl-dev libevent-dev uuid-dev \
-nghttp2 libnghttp2-dev wget \
 libboost-dev libboost-system-dev libhiredis-dev redis-server
 
 
@@ -28,47 +27,25 @@ RUN ln -s /usr/include/libcxxabi/__cxxabi_config.h /usr/include/c++/v1/__cxxabi_
 ARG CXX=g++
 ENV CXX=${CXX}
 
+# compile gtest with given compiler
+ADD ./docker/gtest.sh /usr/local/bin/gtest.sh
+RUN /usr/local/bin/gtest.sh
+
 ARG BACKEND=libevent
 ENV BACKEND=${BACKEND}
 
-# compile gtest with given compiler
-RUN  cd /usr/src/gtest && \
-  if [ "$CXX" = "g++" ] ; then \
-  cmake .; \
-  else \
-  cmake -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_CXX_FLAGS="-std=c++14 -stdlib=libc++" . ; \
-  fi && \
-  make && \
-  ln -s /usr/src/gtest/libgtest.a /usr/lib/libgtest.a
+ARG BUILDCHAIN=make
+ENV BUILDCHAIN=${BUILDCHAIN}
 
+# build dependencies
+ADD ./docker/build.sh /usr/local/bin/build.sh
+ADD ./docker/install.sh /usr/local/bin/install.sh
 
-RUN cd /usr/local/src && \
-  git clone https://github.com/littlemole/repro.git && \
-  cd repro && \
-  make clean && \
-  make CXX=${CXX} BACKEND=${BACKEND} && \
-  make CXX=${CXX} BACKEND=${BACKEND} test && \
-  make CXX=${CXX} BACKEND=${BACKEND} install 
+RUN /usr/local/bin/install.sh cryptoneat 
+RUN /usr/local/bin/install.sh repro 
+RUN /usr/local/bin/install.sh prio 
 
+RUN mkdir -p /usr/local/src/repro-redis
+ADD . /usr/local/src/repro-redis
 
-RUN cd /usr/local/src && \
-  git clone https://github.com/littlemole/cryptoneat.git && \
-  cd cryptoneat && \
-  make clean && \
-  make CXX=${CXX} BACKEND=${BACKEND} && \
-  make CXX=${CXX} BACKEND=${BACKEND} test && \
-  make CXX=${CXX} BACKEND=${BACKEND} install 
-  
-RUN cd /usr/local/src && \
-  git clone https://github.com/littlemole/prio.git && \
-  cd prio && \
-  make clean && \
-  make CXX=${CXX} BACKEND=${BACKEND} && \
-  make CXX=${CXX} BACKEND=${BACKEND} test && \
-  make CXX=${CXX} BACKEND=${BACKEND} install 
-
-
-RUN mkdir -p /opt/workspace/reproredis
-
-ADD docker/run.sh /usr/local/bin/run.sh
-CMD ["/usr/local/bin/run.sh"]
+RUN /etc/init.d/redis-server start && /usr/local/bin/build.sh repro-redis 
