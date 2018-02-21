@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 echo "**********************************"
 echo "building $1 for $BACKEND with" 
