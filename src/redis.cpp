@@ -273,14 +273,14 @@ Redis::FutureType Redis::cmd()
 			if ((*ctx_)->err != 0)
 			{
 				ctx_->markAsInvalid();
-				throw(Ex((*ctx_)->errstr));
+				throw(repro::Ex((*ctx_)->errstr));
 			}
 
 			Reply rep(shared_from_this(), r);
 
 			if (rep.isError())
 			{
-				throw(Ex((*ctx_)->errstr));
+				throw(repro::Ex((*ctx_)->errstr));
 			}
 
 			// shameful workaround to make subscriptions "work" on win32
@@ -295,14 +295,14 @@ Redis::FutureType Redis::cmd()
 				if ((*ctx_)->err != 0)
 				{
 					ctx_->markAsInvalid();
-					throw(Ex((*ctx_)->errstr));
+					throw(repro::Ex((*ctx_)->errstr));
 				}
 
 				Reply reply(shared_from_this(), r);
 
 				if (reply.isError())
 				{
-					throw(Ex((*ctx_)->errstr));
+					throw(repro::Ex((*ctx_)->errstr));
 				}
 
 				promise_.resolve(std::move(reply));

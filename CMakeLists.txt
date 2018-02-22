@@ -52,13 +52,15 @@ IF (WIN32)
 
 	set(OSLIBS "Ws2_32" "Rpcrt4")
 
-	find_library(REDIS_LIBRARY NAMES libhiredis)
+	find_library(PRIOCPP_LIBRARY NAMES priocppd)
+	find_library(REDIS_LIBRARY NAMES hiredis)
+	find_library(INTEROP_LIBRARY NAMES Win32_Interop)
 	find_library(LIBEVENT_LIBRARY NAMES event)
 
 	set(BUILDFLAGS "-await ${FLAGS}")
 	set(DEBUGFLAGS "-DMOL_PROMISE_DEBUG")
 
-	set(LIBS ${CRYPTONEAT_LIBRARY} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${REDIS_LIBRARY} ${STDLIB} )
+	set(LIBS ${PRIOCPP_LIBRARY} ${CRYPTONEAT_LIBRARY} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${REDIS_LIBRARY} ${INTEROP_LIBRARY} ${STDLIB} )
 
  ELSEIF(UNIX)
 
@@ -133,8 +135,11 @@ target_link_libraries(Tests reproredisd ${LIBS} ${BACKEND} ${OSLIBS} )
 # tests
 ############################################
 
-add_test(NAME AllTests COMMAND Tests)
-
+if(WIN32)
+	message("skip tests on win32")
+else()
+	add_test(NAME AllTests COMMAND Tests)
+endif()
  
 ############################################
 # install rules
