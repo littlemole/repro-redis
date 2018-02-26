@@ -10,8 +10,11 @@ cd /usr/local/src/$1
 
 if [ "$BUILDCHAIN" == "make" ] 
 then
-    make clean
-    make -e test
+    if [ "$SKIPTESTS" == "true"]
+    then
+        make clean
+        make -e test
+    endif
     make clean
     make -e install
 else

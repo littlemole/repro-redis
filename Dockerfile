@@ -48,4 +48,4 @@ RUN /usr/local/bin/install.sh prio
 RUN mkdir -p /usr/local/src/repro-redis
 ADD . /usr/local/src/repro-redis
 
-RUN /etc/init.d/redis-server start && /usr/local/bin/build.sh repro-redis 
+RUN /etc/init.d/redis-server start && SKIPTESTS=true /usr/local/bin/build.sh repro-redis 
