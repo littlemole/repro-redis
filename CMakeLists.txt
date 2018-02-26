@@ -1,14 +1,35 @@
 ############################################
 cmake_minimum_required(VERSION 2.8.9)
+cmake_policy(SET CMP0054 NEW)
 project(reproredis)
 include(CTest)
+
+############################################
+# c++ std level 14
+############################################
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 ############################################
-# macros
+# vcpkg support to install release or 
+# debug only
+############################################
+
+set(INSTALL_DEBUG "On")
+set(INSTALL_RELEASE "On")
+
+############################################
+# std dependencies
+############################################
+
+find_package(GTest REQUIRED)
+find_package(OpenSSL REQUIRED)
+
+
+############################################
+# helper macro to set target compile flags
 ############################################
 
 macro(AddCompilerFlags target flags)
@@ -45,14 +66,12 @@ set( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${LINKERFLAGS}" )
 # OS specific dependencies
 ############################################
 
-find_package(GTest REQUIRED)
-find_package(OpenSSL REQUIRED)
-
 IF (WIN32)
 
 	set(OSLIBS "Ws2_32" "Rpcrt4")
 
-	find_library(PRIOCPP_LIBRARY NAMES priocppd)
+	find_library(PRIOCPP_LIBRARY NAMES priocpp)
+	find_library(PRIOCPPD_LIBRARY NAMES priocppd)
 	find_library(REDIS_LIBRARY NAMES hiredis)
 	find_library(INTEROP_LIBRARY NAMES Win32_Interop)
 	find_library(LIBEVENT_LIBRARY NAMES event)
@@ -60,7 +79,17 @@ IF (WIN32)
 	set(BUILDFLAGS "-await ${FLAGS}")
 	set(DEBUGFLAGS "-DMOL_PROMISE_DEBUG")
 
-	set(LIBS ${PRIOCPP_LIBRARY} ${CRYPTONEAT_LIBRARY} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${REDIS_LIBRARY} ${INTEROP_LIBRARY} ${STDLIB} )
+	set(LIBS ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${REDIS_LIBRARY} ${INTEROP_LIBRARY} ${STDLIB} ${OSLIBS})
+
+	if( "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+		set(INSTALL_DEBUG "Off")
+		set(LIBS ${CMAKE_PROJECT_NAME} ${PRIOCPP_LIBRARY} ${LIBS})
+		set(DEBUGFLAGS " ")
+	else()
+		set(INSTALL_RELEASE "Off")
+		set(LIBS ${CMAKE_PROJECT_NAME}d ${PRIOCPPD_LIBRARY} ${LIBS})
+		set(DEBUGFLAGS "-DMOL_PROMISE_DEBUG ")
+	endif()
 
  ELSEIF(UNIX)
 
@@ -76,7 +105,7 @@ IF (WIN32)
     set(BUILDFLAGS " ${FLAGS}")
 	set(DEBUGFLAGS "-g -DMOL_PROMISE_DEBUG")
 
-	set(LIBS ${PRIOCPP_LIBRARIES} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${HIREDIS_LIBRARIES} ${STDLIB} )
+	set(LIBS ${CMAKE_PROJECT_NAME}d ${PRIOCPPD_LIBRARIES} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${HIREDIS_LIBRARIES} ${STDLIB} ${OSLIBS} )
 ENDIF ()
 
 
@@ -104,36 +133,32 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 include_directories(${PRIOCPP_INCLUDE_DIRS})
 
 file(GLOB SOURCES "src/*.cpp")
-file(GLOB HEADERS "include/reproredis/*.h")
+file(GLOB HEADERS "include/${CMAKE_PROJECT_NAME}/*.h")
 
 ############################################
-# targets
+# library targets
 ############################################
 
-add_library(reproredis  STATIC ${SOURCES})
-add_library(reproredisd STATIC ${SOURCES})
-
-add_executable(Tests t/test.cpp)
-
-AddCompilerFlags(reproredis ${BUILDFLAGS})
-
-AddCompilerFlags(reproredisd ${BUILDFLAGS})
-AddCompilerFlags(reproredisd ${DEBUGFLAGS})
-
-AddCompilerFlags(Tests ${BUILDFLAGS})
-AddCompilerFlags(Tests ${DEBUGFLAGS})
+add_library(${CMAKE_PROJECT_NAME}  STATIC ${SOURCES})
+add_library(${CMAKE_PROJECT_NAME}d STATIC ${SOURCES})
 
 
-############################################
-# libs
-############################################
-
-target_link_libraries(Tests reproredisd ${LIBS} ${BACKEND} ${OSLIBS} )
+AddCompilerFlags(${CMAKE_PROJECT_NAME}  ${BUILDFLAGS})
+AddCompilerFlags(${CMAKE_PROJECT_NAME}d ${BUILDFLAGS})
+AddCompilerFlags(${CMAKE_PROJECT_NAME}d ${DEBUGFLAGS})
 
 
 ############################################
 # tests
 ############################################
+
+add_executable(Tests t/test.cpp)
+
+AddCompilerFlags(Tests ${BUILDFLAGS})
+AddCompilerFlags(Tests ${DEBUGFLAGS})
+
+target_link_libraries(Tests ${LIBS} ${BACKEND} )
+
 
 if(WIN32)
 	message("skip tests on win32")
@@ -145,9 +170,15 @@ endif()
 # install rules
 ############################################
  
-install(TARGETS reproredis DESTINATION lib)
-install(TARGETS reproredisd DESTINATION lib)
+if( "${INSTALL_RELEASE}" STREQUAL "On")
+	install(TARGETS ${CMAKE_PROJECT_NAME} DESTINATION lib)
+endif()
 
-install(FILES ${HEADERS} DESTINATION include/reproredis)
+if( "${INSTALL_DEBUG}" STREQUAL "On")
+	install(TARGETS ${CMAKE_PROJECT_NAME}d DESTINATION lib)
+endif()
 
-install(FILES reproredis.pc DESTINATION lib/pkgconfig)
+
+install(FILES ${HEADERS} DESTINATION include/${CMAKE_PROJECT_NAME})
+
+install(FILES ${CMAKE_PROJECT_NAME}.pc DESTINATION lib/pkgconfig)
