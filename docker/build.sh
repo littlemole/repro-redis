@@ -14,7 +14,7 @@ then
     then
         make clean
         make -e test
-    endif
+    fi
     make clean
     make -e install
 else
