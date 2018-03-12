@@ -58,12 +58,12 @@ install: remove ## installs lib to $(DESTDIR)/$(PREFIX) defaults to /usr/local
 	-rm -rf $(DESTDIR)/$(PREFIX)/include/$(LIBNAME)
 	cd src && make clean && make -e -f Makefile 
 	cd t && make clean && make -e -f Makefile 
-	if [ "$$SKIPTESTS" != "true" ]; do make run-tests; fi
+	if [ "$$SKIPTESTS" != "true" ]; then make run-tests; fi
 	make build
 	cp -r ./build/* $(DESTDIR)/$(PREFIX)	
 	cd src && make clean && make release -e -f Makefile 
 	cd t && make clean && make release -e -f Makefile 
-	if [ "$$SKIPTESTS" != "true" ]; do make run-tests; fi
+	if [ "$$SKIPTESTS" != "true" ]; then make run-tests; fi
 	make build
 	cp -r ./build/* $(DESTDIR)/$(PREFIX)	
 
