@@ -74,7 +74,6 @@ IF (WIN32)
 
     find_package(PkgConfig)
     pkg_check_modules(HIREDIS REQUIRED hiredis)
-    pkg_check_modules(NGHTTP2 REQUIRED libnghttp2)
     pkg_check_modules(PRIOCPP REQUIRED priocpp)
     pkg_check_modules(LIBEVENT REQUIRED libevent_pthreads)
 
