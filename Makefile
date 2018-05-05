@@ -99,14 +99,16 @@ rmi : ## remove existing docker image, if any
 
 help:
 	@echo "common build flags for all targets:"
-	@echo "\tCXX set to g++|clang++-5.0 to set compiler (defaults to g++)"
+	@echo "\tCXX set to g++|clang++ to set compiler (defaults to g++)"
 	@echo "\tBACKEND set to libevent|boost_asio (defaults to libevent)"
 	@echo "example calls:"
 	@echo "\t make test BACKEND=boost_asio "
 	@echo "\t sudo make install BACKEND=boost_asio "
-	@echo "\t sudo make run CXX=clang++-5.0 "
-	@echo "\t sudo make run CXX=clang++-5.0 BACKEND=boost_asio "
+	@echo "\t sudo make run CXX=clang++ "
+	@echo "\t sudo make run CXX=clang++ BACKEND=boost_asio "
 	@echo "available targets:"
 	@grep -E -h '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: build help rmi rmc stop bash image clean-image release remove install test clean test-build
+
+
