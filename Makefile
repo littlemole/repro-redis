@@ -13,6 +13,9 @@ BUILDCHAIN = make
 CONTAINER = $(shell echo "$(LIBNAME)_$(CXX)_$(BACKEND)_$(BUILDCHAIN)" | sed 's/++/pp/')
 IMAGE = littlemole/$(CONTAINER)
 
+BASE_CONTAINER = $(shell echo "devenv_$(CXX)_$(BUILDCHAIN)" | sed 's/++/pp/')
+BASE_IMAGE = littlemole\/$(BASE_CONTAINER)
+
 #################################################
 # rule to compile all (default rule)
 #################################################
@@ -75,10 +78,13 @@ remove: ## remove lib from $(DESTDIR)/$(PREFIX) defaults to /usr/local
 
 # docker stable testing environment
 
-image: ## build docker test image
+update-dockerfile:
+	/bin/sed -i "s/FROM .*/FROM ${BASE_IMAGE}/" Dockerfile
+
+image: update-dockerfile## build docker test image
 	docker build -t $(IMAGE) . -fDockerfile  --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND) --build-arg BUILDCHAIN=$(BUILDCHAIN)
 
-clean-image: ## rebuild the docker test image from scratch
+clean-image: update-dockerfile ## rebuild the docker test image from scratch
 	docker build -t $(IMAGE) . --no-cache -fDockerfile --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND) --build-arg BUILDCHAIN=$(BUILDCHAIN)
 		
 bash: rmc image ## run the docker image and open a shell
