@@ -52,21 +52,38 @@ endif()
 
 IF (WIN32)
 
+	if(NOT CMAKE_BUILD_TYPE)
+	  set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel." FORCE)
+	endif()
+
+	message("+++++++++++++++++")
+	message("${CMAKE_BUILD_TYPE}")
+	message("+++++++++++++++++")
+
 	set(OSLIBS "Ws2_32" "Rpcrt4")
+	set(BUILDFLAGS "-await ${FLAGS}")
 
 	find_library(LIBEVENT_LIBRARY NAMES event)
 	find_library(NG2HTTP_LIBRARY NAMES nghttp2)
-    find_library(PRIOCPP_LIBRARY NAMES priocpp)
-    find_library(PRIOCPPD_LIBRARY NAMES priocppd)
 	find_library(REDIS_LIBRARY NAMES hiredis)
 	find_library(INTEROP_LIBRARY NAMES Win32_Interop)
+	set(LIBS ${REDIS_LIBRARY} ${INTEROP_LIBRARY} ${NG2HTTP_LIBRARY} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${STDLIB}  )
 
-
-	set(BUILDFLAGS "-await ${FLAGS}")
-
-	set(LIBS ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${NG2HTTP_LIBRARY} ${REDIS_LIBRARY} ${INTEROP_LIBRARY} debug ${PRIOCPPD_LIBRARY} optimized ${PRIOCPP_LIBRARY} ${STDLIB}  )
+	if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
+    	find_library(PRIOCPP_LIBRARY NAMES priocpp.lib)
+    	find_library(PRIOCPPD_LIBRARY NAMES priocppd.lib)
+		set(LIBS ${LIBS} debug ${PRIOCPPD_LIBRARY} optimized  ${PRIOCPP_LIBRARY} )
+    else()
+		find_library(PRIOCPP_LIBRARY NAMES priocpp)
+		set(LIBS ${LIBS} ${PRIOCPP_LIBRARY} )
+	endif()
 
 	set(LIBS ${LIBS} debug ${CMAKE_PROJECT_NAME} optimized ${CMAKE_PROJECT_NAME} )
+
+
+	message("+++++++++++++++++")
+	message("LIBS: ${LIBS}")
+	message("+++++++++++++++++")
 
  ELSEIF (UNIX)
 
