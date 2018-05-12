@@ -241,18 +241,7 @@ repro::Future<> coroutine_example(reproredis::RedisPool& redis, std::string& res
 
 #include <stack>
 
-
-class RedisResult 
-{
-public:
-	virtual ~RedisResult() {}
-	virtual bool isNill()     					{ return false; }
-	virtual bool isError()    					{ return false; }
-	virtual std::string str() 					{ return ""; }
-	virtual long integer()    					{ return 0; }
-	virtual long size()   						{ return 0; }
-	virtual RedisResult* element(std::size_t i) { return nullptr; }
-};
+class RedisResult;
 
 class RedisParser;
 
@@ -302,7 +291,7 @@ struct MyRedisLocator
 class MyRedisPool
 {
 public:
-	typedef repro::Future<RedisResult*> FutureType;
+	typedef repro::Future<std::shared_ptr<RedisResult>> FutureType;
 	typedef prio::ResourcePool<MyRedisLocator> Pool;
 	typedef Pool::ResourcePtr ResourcePtr;
 
@@ -318,7 +307,7 @@ public:
 	//repro::Future<ResourcePtr> operator()();
 
     template<class ... Args>
-	repro::Future<RedisResult*> cmd(const Args& ... args);
+	repro::Future<std::shared_ptr<RedisResult>> cmd( Args ... args);
 
     //FutureType subscribe( const std::string& topic );
 
@@ -335,10 +324,30 @@ private:
 };
 
 
-class RedisBulkStringResult : public RedisResult
+class RedisResult : public std::enable_shared_from_this<RedisResult>
 {
 public:
 
+	typedef std::shared_ptr<RedisResult> Ptr;
+
+	MyRedisPool::ResourcePtr con;
+
+	virtual ~RedisResult() {}
+	virtual bool isNill()     						{ return false; }
+	virtual bool isError()    						{ return false; }
+	virtual std::string str() 						{ return ""; }
+	virtual long integer()    						{ return 0; }
+	virtual long size()   							{ return 0; }
+	virtual RedisResult::Ptr element(std::size_t i) { return nullptr; }
+	virtual Future<RedisResult::Ptr> parse()		{}
+	template<class ... Args>
+	repro::Future<RedisResult::Ptr> cmd(Args ... args);
+
+};
+
+class RedisBulkStringResult : public RedisResult
+{
+public:
 
 	RedisBulkStringResult(RedisParser& p, long s)
 		: size_(s), parser_(p)
@@ -349,15 +358,15 @@ public:
 	virtual long size()   			{ return size_; }
 	virtual long integer()    		{ std::istringstream iss(str_); long r; iss >> r; return r; }
 
-	Future<RedisResult*> parse()
+	virtual Future<RedisResult::Ptr> parse()
 	{
 		if(size_==-1)
 		{
 			nil_ = true;
-			return prio::resolved((RedisResult*)this);
+			return prio::resolved(shared_from_this());
 		}
 
-		auto p = repro::promise<RedisResult*>();
+		auto p = repro::promise<RedisResult::Ptr>();
 
 		parse_response(p);
 
@@ -371,8 +380,8 @@ private:
 	std::string str_;
 	RedisParser& parser_;
 		
-	void parse_response(repro::Promise<RedisResult*> p);
-	void read(repro::Promise<RedisResult*> p);
+	void parse_response(repro::Promise<RedisResult::Ptr> p);
+	void read(repro::Promise<RedisResult::Ptr> p);
 };
 
 class RedisSimpleStringResult : public RedisResult
@@ -387,13 +396,13 @@ public:
 	virtual long size()   			{ return str_.size(); }
 	virtual long integer()    		{ std::istringstream iss(str_); long r; iss >> r; return r; }
 
-	Future<RedisResult*> parse()
+	virtual Future<RedisResult::Ptr> parse()
 	{
-		auto p = repro::promise<RedisResult*>();
+		auto p = repro::promise<RedisResult::Ptr>();
 
 		nextTick().then([this,p]()
 		{
-			p.resolve((RedisResult*)this);
+			p.resolve(shared_from_this());
 		});
 
 		return p.future();
@@ -418,13 +427,13 @@ public:
 	virtual long size()   			{ return str_.size(); }
 	virtual long integer()    		{ std::istringstream iss(str_); long r; iss >> r; return r; }
 
-	Future<RedisResult*> parse()
+	virtual Future<RedisResult::Ptr> parse()
 	{
-		auto p = repro::promise<RedisResult*>();
+		auto p = repro::promise<RedisResult::Ptr>();
 
 		nextTick().then([this,p]()
 		{
-			p.resolve((RedisResult*)this);
+			p.resolve(shared_from_this());
 		});
 
 		return p.future();
@@ -447,13 +456,13 @@ public:
 	virtual long size()   			{ return str_.size(); }
 	virtual long integer()    		{ std::istringstream iss(str_); long r; iss >> r; return r; }
 	
-	Future<RedisResult*> parse()
+	virtual Future<RedisResult::Ptr> parse()
 	{
-		auto p = repro::promise<RedisResult*>();
+		auto p = repro::promise<RedisResult::Ptr>();
 
 		nextTick().then([this,p]()
 		{
-			p.resolve((RedisResult*)this);
+			p.resolve(shared_from_this());
 		});
 
 		return p.future();
@@ -470,32 +479,30 @@ class RedisArrayResult : public RedisResult
 public:
 
 	RedisArrayResult(RedisParser& p, long s)
-		:parser_(p),size_(s),p_(repro::promise<RedisResult*>() )
+		:parser_(p),size_(s),p_(repro::promise<RedisResult::Ptr>() )
 	{
-		std::cout << "RedisArrayResult("<<s<<")" << std::endl;
+		std::cout << "array size " << s << std::endl;
 	}
 	
-	virtual bool isNill()     		{ return nil_; }
-	virtual long size()   			{ return size_; }
-	virtual RedisResult* element(std::size_t i)  { return elements_[i]; }
+	virtual bool isNill()     						 { return nil_; }
+	virtual long size()   							 { return size_; }
+	virtual RedisResult::Ptr element(std::size_t i)  { return elements_[i]; }
 
-	Future<RedisResult*> parse()
+	virtual Future<RedisResult::Ptr> parse()
 	{
 		if(size_==-1)
 		{
 			nil_ = true;
-			return prio::resolved((RedisResult*)this);
+			return prio::resolved(shared_from_this());
 		}
 
 		read()
-		.then([this](RedisResult* r)
+		.then([this](RedisResult::Ptr r)
 		{
-			elements_.push_back(r);
-			std::cout << size_ << " <?> " << elements_.size() << std::endl;
 			if(size_ == elements_.size())
 			{
-				p_.resolve(this);
-				std::cout << "!!!!!!ccc!!!!!!" << std::endl;
+				std::cout << size_ << " <-> " << elements_.size() << std::endl;
+				p_.resolve(shared_from_this());
 				return;
 			}
 			parse();
@@ -508,16 +515,24 @@ public:
 		return p_.future();
 	}
 
+	void clear()
+	{
+		//size_ = 0;
+		//elements_.clear();
+	}
+
 private:
+
+	RedisResult::Ptr resultFactory(const std::string& cmd);
 
 	bool nil_ = false;
 	long size_ = 0;
 	RedisParser& parser_;
-	std::vector<RedisResult*> elements_;
-	repro::Promise<RedisResult*> p_;
+	std::vector<RedisResult::Ptr> elements_;
+	repro::Promise<RedisResult::Ptr> p_;
 
-	Future<RedisResult*> read();
-	void parse_response(std::string cmd,repro::Promise<RedisResult*> p);		
+	Future<RedisResult::Ptr> read();
+	void parse_response(std::string cmd,repro::Promise<RedisResult::Ptr> p);		
 };
 
 class RedisParser
@@ -530,23 +545,31 @@ public:
 
 
 	RedisParser()
-		: p_ (repro::promise<RedisResult*>())
+		: p_ (repro::promise<RedisResult::Ptr>())
 	{
-		result_ = new RedisArrayResult(*this,1);		
+		result_ = std::make_shared<RedisArrayResult>(*this,1);		
 	}
 
-	Future<RedisResult*> parse()
+	Future<RedisResult::Ptr> parse()
 	{
-		result_->parse()
-		.then([this](RedisResult* r)
+		RedisArrayResult* rar = (RedisArrayResult*)result_.get();
+		rar->parse()
+		.then([this,rar](RedisResult::Ptr r)
 		{
-			std::cout << "#########################" << std::endl;
-			p_.resolve(r->element(0));
+			RedisResult::Ptr res = r->element(0);
+			std::cout << "----> " << res->size() << std::endl;
+			//rar->clear();
+			res->con = con;
+			auto tmp = p_;
+			delete this;
+			tmp.resolve(res);
 		})		
 		.otherwise([this](const std::exception& ex)
 		{
 			std::cout << ex.what() << std::endl;
-			p_.reject(ex);
+			auto tmp = p_;
+			delete this;			
+			tmp.reject(ex);
 		});	
 
 		return p_.future();
@@ -559,11 +582,11 @@ public:
 
 private:
 
-	repro::Promise<RedisResult*> p_;
-	RedisArrayResult* result_;	
+	repro::Promise<RedisResult::Ptr> p_;
+	RedisArrayResult::Ptr result_;	
 };
 
-void RedisBulkStringResult::parse_response(repro::Promise<RedisResult*> p)
+void RedisBulkStringResult::parse_response(repro::Promise<RedisResult::Ptr> p)
 {
 	int s = parser_.buffer.size() - parser_.pos;
 
@@ -573,14 +596,14 @@ void RedisBulkStringResult::parse_response(repro::Promise<RedisResult*> p)
 		parser_.consume(size_ + 2);
 		nextTick().then([this,p]()
 		{
-			p.resolve((RedisResult*)this);
+			p.resolve(shared_from_this());
 		});
 		return;
 	}
 	read(p);
 }
 
-void RedisBulkStringResult::read(repro::Promise<RedisResult*> p)
+void RedisBulkStringResult::read(repro::Promise<RedisResult::Ptr> p)
 {
 	(*(parser_.con))->con->read()
 	.then([this,p](prio::Connection::Ptr con, std::string data)
@@ -596,18 +619,74 @@ void RedisBulkStringResult::read(repro::Promise<RedisResult*> p)
 	});			
 }
 
-void RedisArrayResult::parse_response( std::string cmd, repro::Promise<RedisResult*> p)
+RedisResult::Ptr RedisArrayResult::resultFactory(const std::string& cmd)
 {
-	std::cout << "RedisArrayResult::parse_response " << cmd << std::endl;
+	RedisResult::Ptr r;
+	switch(cmd[0])
+	{
+		case '-' : // error
+		{
+			r = std::make_shared<RedisErrorResult>(parser_,cmd.substr(1));
+			break;
+		}
+		case '+' : // simple string
+		{
+			r = std::make_shared<RedisSimpleStringResult>(parser_,cmd.substr(1));
+			break;
+		}
+		case ':' : // simple integer
+		{
+			r = std::make_shared<RedisIntegerResult>(parser_,cmd.substr(1));
+			break;
+		}			
+		case '$' : // bulk string
+		{
+			std::istringstream iss(cmd.substr(1));
+			long size;
+			iss >> size;
 
+			r = std::make_shared<RedisBulkStringResult>(parser_,size);
+			break;
+		}
+		case '*' : // array 
+		{
+			std::istringstream iss(cmd.substr(1));
+			long size;
+			iss >> size;
+
+			r = std::make_shared<RedisArrayResult>(parser_,size);
+			break;
+		}			
+	}
+	elements_.push_back(r);
+	return r;
+}
+
+
+void RedisArrayResult::parse_response( std::string cmd, repro::Promise<RedisResult::Ptr> p)
+{
+	std::cout << "parse: " << cmd  << std::endl;
+	RedisResult::Ptr r = resultFactory(cmd);
+	r->parse()
+	.then([p](RedisResult::Ptr r)
+	{
+		std::cout << "got error! " << r->str() << "/" << r->size() <<  std::endl;
+		p.resolve(r);					
+	})
+	.otherwise([p](const std::exception& ex)
+	{
+		p.reject(ex);
+	});
+/*
 	switch(cmd[0])
 	{
 		case '-' : 
 		{
 			// error
-			RedisErrorResult* r = new RedisErrorResult(parser_,cmd.substr(1));
+			auto r = std::make_shared<RedisErrorResult>(parser_,cmd.substr(1));
+			elements_.push_back(r);
 			r->parse()
-			.then([p](RedisResult* r)
+			.then([p](RedisResult::Ptr r)
 			{
 				std::cout << "got error! " << r->str() << std::endl;
 				p.resolve(r);					
@@ -617,9 +696,10 @@ void RedisArrayResult::parse_response( std::string cmd, repro::Promise<RedisResu
 		case '+' : 
 		{
 			// simple string
-			RedisSimpleStringResult* r = new RedisSimpleStringResult(parser_,cmd.substr(1));
+			auto r = std::make_shared<RedisSimpleStringResult>(parser_,cmd.substr(1));
+			elements_.push_back(r);
 			r->parse()
-			.then([p](RedisResult* r)
+			.then([p](RedisResult::Ptr r)
 			{
 				std::cout << "got sstring! " << r->str() << std::endl;
 				p.resolve(r);					
@@ -629,9 +709,10 @@ void RedisArrayResult::parse_response( std::string cmd, repro::Promise<RedisResu
 		case ':' : 
 		{
 			// simple integer
-			RedisIntegerResult* r = new RedisIntegerResult(parser_,cmd.substr(1));
+			auto r = std::make_shared<RedisIntegerResult>(parser_,cmd.substr(1));
+			elements_.push_back(r);
 			r->parse()
-			.then([p](RedisResult* r)
+			.then([p](RedisResult::Ptr r)
 			{
 				std::cout << "got int! " << r->integer() << std::endl;
 				p.resolve(r);					
@@ -647,9 +728,11 @@ void RedisArrayResult::parse_response( std::string cmd, repro::Promise<RedisResu
 
 			std::cout << "size:" << size << std::endl;
 
-			RedisBulkStringResult* r = new RedisBulkStringResult(parser_,size);
+			auto r = std::make_shared<RedisBulkStringResult>(parser_,size);
+			elements_.push_back(r);
+			
 			r->parse()
-			.then([p](RedisResult* r)
+			.then([p](RedisResult::Ptr r)
 			{
 				std::cout << "got bstring! " << r->str() << std::endl;
 				p.resolve(r);					
@@ -665,9 +748,11 @@ void RedisArrayResult::parse_response( std::string cmd, repro::Promise<RedisResu
 
 			std::cout << "array size:" << size << std::endl;
 
-			RedisArrayResult* r = new RedisArrayResult(parser_,size);
+			auto r = std::make_shared<RedisArrayResult>(parser_,size);
+			elements_.push_back(r);
+			
 			r->parse()
-			.then([p](RedisResult* r)
+			.then([p](RedisResult::Ptr r)
 			{
 				std::cout << "got array! " << r->size() << std::endl;
 				p.resolve(r);					
@@ -675,20 +760,18 @@ void RedisArrayResult::parse_response( std::string cmd, repro::Promise<RedisResu
 			break;
 		}			
 	}
+	*/
 }
 
 
-repro::Future<RedisResult*> RedisArrayResult::read()
+repro::Future<RedisResult::Ptr> RedisArrayResult::read()
 {
-	auto p = repro::promise<RedisResult*>();
-
-	std::cout << "RedisArrayResult::read() " << parser_.pos << std::endl;
+	auto p = repro::promise<RedisResult::Ptr>();
 
 	std::size_t pos = parser_.buffer.find("\r\n",parser_.pos);
 	if ( pos != std::string::npos )
 	{
 		std::string tmp = parser_.buffer.substr(parser_.pos,pos-parser_.pos);
-		std::cout << ">>>>>>>>>>< " << pos << ":" << tmp << std::endl << "---" << std::endl;
 		parser_.consume(pos-parser_.pos+2);
 		parse_response(tmp,p );
 		return p.future();
@@ -699,7 +782,7 @@ repro::Future<RedisResult*> RedisArrayResult::read()
 	{
 		parser_.buffer.append(data);
 		read()
-		.then([this,p](RedisResult* r)
+		.then([this,p](RedisResult::Ptr r)
 		{
 			p.resolve(r);
 		})
@@ -758,12 +841,13 @@ private:
 
 
 template<class ... Args>
-repro::Future<RedisResult*> MyRedisPool::cmd(const Args& ... args)
+repro::Future<RedisResult::Ptr> MyRedisPool::cmd( Args ... args)
 {
-	auto p =  repro::promise<RedisResult*>();
+	auto p =  repro::promise<RedisResult::Ptr>();
 
 	Serializer serializer;
 	std::string cmd = serializer.serialize(args...);
+	std::cout << "CMD:" << cmd << std::endl;
 
 	RedisParser* parser = new RedisParser();
 
@@ -777,7 +861,39 @@ repro::Future<RedisResult*> MyRedisPool::cmd(const Args& ... args)
 	{
 		return parser->parse();
 	})
-	.then([p](RedisResult* r)
+	.then([p](RedisResult::Ptr r)
+	{
+		p.resolve(r);
+	})	
+	.otherwise([p](const std::exception& ex)
+	{
+		p.reject(ex);
+	});
+
+    return p.future();
+}
+
+
+
+template<class ... Args>
+repro::Future<RedisResult::Ptr> RedisResult::cmd( Args ... args)
+{
+	auto p =  repro::promise<RedisResult::Ptr>();
+
+	Serializer serializer;
+	std::string cmd = serializer.serialize(args...);
+
+	std::cout << "CMD:" << cmd << std::endl;
+
+	RedisParser* parser = new RedisParser();
+
+	parser->con = con;
+	(*(con))->con->write(cmd)
+	.then([parser](prio::Connection::Ptr con)
+	{
+		return parser->parse();
+	})
+	.then([p](RedisResult::Ptr r)
 	{
 		p.resolve(r);
 	})	
@@ -810,9 +926,9 @@ TEST_F(BasicTest, RawRedis)
 		MyRedisPool redis("redis://localhost:6379");
 
 		redis.cmd("LRANGE", "mylist", 0, -1)
-		.then([](RedisResult* r)
+		.then([](RedisResult::Ptr r)
 		{
-			std::cout << "DONE" << std::endl;
+			std::cout  << "mylist size:" <<  r->size() << std::endl;
 			theLoop().exit();
 		})		
 		.otherwise([](const std::exception& ex)
@@ -824,6 +940,38 @@ TEST_F(BasicTest, RawRedis)
 		theLoop().run();
 	}
 }
+
+
+TEST_F(BasicTest, RawRedisChained) 
+{
+	std::string result;
+	{
+		signal(SIGINT).then([](int s) {theLoop().exit(); });
+
+		MyRedisPool redis("redis://localhost:6379");
+
+		redis.cmd("LRANGE", "mylist", 0, -1)
+		.then([](RedisResult::Ptr r)
+		{
+			std::cout  << "mylist size:" <<  r->size() << std::endl;
+			return r->cmd("INFO");
+		})			
+		.then([](RedisResult::Ptr r)
+		{
+			std::cout << "INFO:" << r->str() << std::endl;
+			theLoop().exit();
+		})		
+		.otherwise([](const std::exception& ex)
+		{
+			std::cout << ex.what() << std::endl;
+			theLoop().exit();
+		});
+
+		theLoop().run();
+	}
+}
+
+
 
 /*
 
