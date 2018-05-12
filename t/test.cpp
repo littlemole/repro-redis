@@ -123,13 +123,11 @@ struct MyRedisLocator
 
 	static repro::Future<type*> retrieve(const std::string& url)
 	{
-		std::cout << "+++++++++++++++++++++" << std::endl;
 		return RedisConnection::connect(url);
 	}
 
 	static void free( type* t)
 	{
-		std::cout << "---------------------" << std::endl;
 		t->con->close();
 		delete t;
 	}
@@ -175,13 +173,13 @@ public:
 
 	MyRedisPool& pool_;
 	MyRedisPool::ResourcePtr res_;
-	repro::Promise<std::shared_ptr<RedisResult>> p_;
+	repro::Promise<std::pair<std::string,std::string>> p_;
 	std::shared_ptr<RedisParser> parser_;
 
 	RedisSubscriber(MyRedisPool& p);
 	~RedisSubscriber();
 
-	repro::Future<std::shared_ptr<RedisResult>> subscribe(const std::string& topic);
+	repro::Future<std::pair<std::string,std::string>> subscribe(const std::string& topic);
 
 	void unsubscribe();
 };
@@ -197,6 +195,7 @@ public:
 	virtual ~RedisResult() {}
 	virtual bool isNill()     						{ return false; }
 	virtual bool isError()    						{ return false; }
+	virtual bool isArray()    						{ return false; }
 	virtual std::string str() 						{ return ""; }
 	virtual long integer()    						{ return 0; }
 	virtual long size()   							{ return 0; }
@@ -345,6 +344,7 @@ public:
 	{
 	}
 	
+	virtual bool isArray()    						 { return true; }
 	virtual bool isNill()     						 { return nil_; }
 	virtual long size()   							 { return size_; }
 	virtual RedisResult::Ptr element(std::size_t i)  { return elements_[i]; }
@@ -395,7 +395,6 @@ private:
 	void parse_response(std::string cmd,repro::Promise<RedisResult::Ptr> p);		
 };
 
-static int parser_cnt = 0;
 
 class RedisParser
 {
@@ -410,14 +409,10 @@ public:
 		: p_ (repro::promise<RedisResult::Ptr>())
 	{
 		result_ = std::make_shared<RedisArrayResult>(*this,1);		
-		parser_cnt++;
-		std::cout << "RedisParser(" << parser_cnt << ")" << std::endl;
 	}
 
 	~RedisParser()
 	{
-		parser_cnt--;
-		std::cout << "~RedisParser(" << parser_cnt << ")" << std::endl;		
 	}
 
 	Future<RedisResult::Ptr> parse()
@@ -442,7 +437,7 @@ public:
 		return p_.future();
 	}
 
-	void listen( repro::Promise<RedisResult::Ptr> p);
+	void listen( repro::Promise<std::pair<std::string,std::string>> p);
 
 
 	void consume(size_t n)
@@ -660,15 +655,12 @@ repro::Future<RedisResult::Ptr> MyRedisPool::cmd( Args ... args)
 RedisSubscriber::RedisSubscriber(MyRedisPool& p)
 	: pool_(p)
 {
-	p_ = repro::promise<std::shared_ptr<RedisResult>>();
-	//parser_ = new RedisParser();
+	p_ = repro::promise<std::pair<std::string,std::string>>();
 	parser_ = std::make_shared<RedisParser>();
 }
 
 RedisSubscriber::~RedisSubscriber()
 {
-	std::cout << "RedisSubscriber DEAD" << std::endl;
-	//delete parser_;
 }
 
 void RedisSubscriber::unsubscribe()
@@ -676,13 +668,12 @@ void RedisSubscriber::unsubscribe()
 	(*(parser_->con))->con->close();
 }
 
-repro::Future<RedisResult::Ptr> RedisSubscriber::subscribe(const std::string& topic)
+repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(const std::string& topic)
 {
 	Serializer serializer;
 	std::string cmd = serializer.serialize("subscribe", topic);
 
 	RedisParser* parser = new RedisParser();
-	//auto parser = std::make_shared<RedisParser>();
 
 	pool_.get()
 	.then([this,cmd,parser](MyRedisPool::ResourcePtr redis)
@@ -697,7 +688,13 @@ repro::Future<RedisResult::Ptr> RedisSubscriber::subscribe(const std::string& to
 	})		
 	.then([this,parser](RedisResult::Ptr r)
 	{				
-		std::cout << "TODO SUBSCRIBED: " << r->size() << "/" << r->isError() << std::endl;
+		
+		if ( r->isError() || r->isNill() || !r->isArray() || r->element(0)->str() != "subscribe" )
+		{
+			//delete parser;
+			throw repro::Ex("redis subscribe failed");
+		}
+		
 		parser_->listen(p_);
 		//RedisParser* p = parser;
 		//parser = nullptr;
@@ -714,7 +711,7 @@ repro::Future<RedisResult::Ptr> RedisSubscriber::subscribe(const std::string& to
 }
 
 
-void RedisParser::listen(repro::Promise<RedisResult::Ptr> p )
+void RedisParser::listen(repro::Promise<std::pair<std::string,std::string>> p )
 {
 	RedisArrayResult* rar = (RedisArrayResult*)result_.get();
 	rar->clear();
@@ -722,7 +719,16 @@ void RedisParser::listen(repro::Promise<RedisResult::Ptr> p )
 	.then([this,p,rar](RedisResult::Ptr r)
 	{
 		RedisResult::Ptr res = r->element(0);
-		p.resolve(res);
+
+		if( res->isError() || res->isNill() || !res->isArray() || res->size() < 3 || res->element(0)->str() != "message")
+		{
+			throw repro::Ex("invalid redis channel reply");
+		}
+
+		std::string channel = res->element(1)->str();
+		std::string msg     = res->element(2)->str();
+
+		p.resolve(std::make_pair(channel,msg));
 		listen(p);
 	})		
 	.otherwise([p,this](const std::exception& ex)
@@ -798,6 +804,8 @@ TEST_F(BasicTest, RawRedis)
 
 		theLoop().run();
 	}
+
+	MOL_TEST_ASSERT_CNTS(0, 0);		
 }
 
 
@@ -828,6 +836,7 @@ TEST_F(BasicTest, RawRedisChained)
 
 		theLoop().run();
 	}
+	MOL_TEST_ASSERT_CNTS(0, 0);		
 }
 
 
@@ -847,7 +856,7 @@ TEST_F(BasicTest, RawRedisSubscribe)
 			redis.cmd("publish", "mytopic", "HELO WORLD")
 			.then([](RedisResult::Ptr r)
 			{
-				std::cout  << "publisher" <<  r->str() << std::endl;
+				//std::cout  << "publisher" <<  r->str() << std::endl;
 			})			
 			.otherwise([](const std::exception& ex)
 			{
@@ -859,21 +868,11 @@ TEST_F(BasicTest, RawRedisSubscribe)
 		
 
 		sub.subscribe("mytopic")
-		.then([&sub](RedisResult::Ptr r)
+		.then([&sub,&result](std::pair<std::string,std::string> msg)
 		{
-			int s = r->size();
-			
-			std::cout  << "subscription: " << s << std::endl;
-
-			for ( int i = 0; i < s; i++)
-			{
-				std::cout  << "\t" <<  r->element(i)->str() << std::endl;				
-			}
-			//sub.unsubscribe();
-			//timeout( []()
-			//{
-				theLoop().exit();
-			//},1,0);
+			std::cout  << "msg: " << msg.first << ": " << msg.second << std::endl;
+			result = msg.second;
+			theLoop().exit();
 		})			
 		.otherwise([](const std::exception& ex)
 		{
@@ -883,6 +882,10 @@ TEST_F(BasicTest, RawRedisSubscribe)
 
 		theLoop().run();
 	}
+
+
+	EXPECT_EQ("HELO WORLD", result);
+	MOL_TEST_ASSERT_CNTS(0, 0);	
 }
 
 /*
