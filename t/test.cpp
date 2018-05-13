@@ -13,6 +13,7 @@
 #include <reproredis/redis.h>
  
 using namespace prio;
+using namespace reproredis;
 
 
 class BasicTest : public ::testing::Test {
@@ -84,7 +85,7 @@ repro::Future<> coroutine_example(reproredis::RedisPool& redis, std::string& res
 #endif
 */
 
-
+/*
 
 class RedisResult;
 
@@ -781,14 +782,14 @@ Future<MyRedisPool::ResourcePtr> MyRedisPool::get()
 	});
 	return p.future();
 }
-
+*/
 TEST_F(BasicTest, RawRedis) 
 {
 	std::string result;
 	{
 		signal(SIGINT).then([](int s) {theLoop().exit(); });
 
-		MyRedisPool redis("redis://localhost:6379");
+		RedisPool redis("redis://localhost:6379");
 
 		redis.cmd("LRANGE", "mylist", 0, -1)
 		.then([](RedisResult::Ptr r)
@@ -815,7 +816,7 @@ TEST_F(BasicTest, RawRedisChained)
 	{
 		signal(SIGINT).then([](int s) {theLoop().exit(); });
 
-		MyRedisPool redis("redis://localhost:6379");
+		RedisPool redis("redis://localhost:6379");
 
 		redis.cmd("LRANGE", "mylist", 0, -1)
 		.then([](RedisResult::Ptr r)
@@ -846,7 +847,7 @@ TEST_F(BasicTest, RawRedisSubscribe)
 	{
 		signal(SIGINT).then([](int s) {theLoop().exit(); });
 
-		MyRedisPool redis("redis://localhost:6379");
+		RedisPool redis("redis://localhost:6379");
 
 		RedisSubscriber sub(redis);
 

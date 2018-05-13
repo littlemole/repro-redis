@@ -12,72 +12,54 @@
 
 namespace reproredis   {
 
-template<class T>
-void populate_args(std::vector<std::string>& v, const T& t)
+
+class RedisResult;
+class RedisParser;
+class RedisArrayResult;
+
+class RedisConnection
 {
-    std::ostringstream oss;
-    oss << t;
-    v.push_back(oss.str());
-}
+public:
 
-template<class T, class ... Args>
-void populate_args(std::vector<std::string>& v, const T& t, Args ... args )
-{
-    populate_args(v,t);
-    populate_args(v,args...);
-}
+	prio::Connection::Ptr con;
 
-//////////////////////////////////////////////////////////////
+	static repro::Future<RedisConnection*> connect(const std::string& url);
+};
 
-class Redis;
-typedef std::shared_ptr<Redis> RedisPtr;
-
-//////////////////////////////////////////////////////////////
 
 struct RedisLocator
 {
-	typedef redisContext type;
+	typedef RedisConnection type;
 
-	static repro::Future<type*> retrieve(const std::string& url);
-	static void free( type* t);
+	static repro::Future<type*> retrieve(const std::string& url)
+	{
+		return RedisConnection::connect(url);
+	}
+
+	static void free( type* t)
+	{
+		t->con->close();
+		delete t;
+	}
 };
-
-//////////////////////////////////////////////////////////////
-
-class Reply;
 
 class RedisPool
 {
 public:
-	typedef repro::Future<Reply> FutureType;
+	typedef repro::Future<std::shared_ptr<RedisResult>> FutureType;
 	typedef prio::ResourcePool<RedisLocator> Pool;
 	typedef Pool::ResourcePtr ResourcePtr;
 
-	RedisPool(const std::string& url, int capacity = 4)
-		: url_(url), pool_(capacity)
-	{}
-
-	RedisPool() {}
-
-	~RedisPool() {}
+	RedisPool(const std::string& url, int capacity = 4);
+	RedisPool();
+	~RedisPool();
 
 	repro::Future<ResourcePtr> get();
-	repro::Future<ResourcePtr> operator()();
 
     template<class ... Args>
-	repro::Future<Reply> cmd(const Args& ... args);
+	FutureType cmd( Args ... args);
 
-    FutureType subscribe( const std::string& topic );
-
-	void shutdown()
-	{
-		pool_.shutdown();
-	}
-
-	RedisPool* operator->()
-	{
-		return this;
-	}
+	void shutdown();
 
 private:
 
@@ -86,141 +68,166 @@ private:
 };
 
 
-//////////////////////////////////////////////////////////////
-
-class Reply
+class RedisSubscriber
 {
 public:
-	Reply();
-    Reply( RedisPtr redis, redisReply* r );
-	Reply(const Reply& rhs);// = default;
-	Reply(Reply&& rhs);// = default;
-    Reply( RedisPtr redis, redisReply* r, bool freeReply );
-    ~Reply();
 
-	Reply& operator=(const Reply& rhs);// = default;
-	Reply& operator=(Reply&& rhs);// = default;
+	RedisPool& pool_;
+	RedisPool::ResourcePtr res_;
+	repro::Promise<std::pair<std::string,std::string>> p_;
+	std::shared_ptr<RedisParser> parser_;
 
-    bool isError();
-    bool isStatus();
-    bool isString();
-    bool isInteger();
-    bool isNil();
-    bool isArray();
-    size_t size();
-    Reply element(size_t i);
-    std::string asString();
-    long long asLong();
-    size_t asInt();
+	RedisSubscriber(RedisPool& p);
+	~RedisSubscriber();
 
-    std::string str();
+	repro::Future<std::pair<std::string,std::string>> subscribe(const std::string& topic);
 
-    RedisPtr operator()()
-    {
-    	return redis_;
-    }
+	void unsubscribe();
+};
 
-private:
-    RedisPtr redis_;
-    std::shared_ptr<redisReply> reply_;
+class RedisResult : public std::enable_shared_from_this<RedisResult>
+{
+public:
+
+	typedef std::shared_ptr<RedisResult> Ptr;
+
+	RedisPool::ResourcePtr con;
+
+	virtual ~RedisResult() {}
+	virtual bool isNill()     						{ return false; }
+	virtual bool isError()    						{ return false; }
+	virtual bool isArray()    						{ return false; }
+	virtual std::string str() 						{ return ""; }
+	virtual long integer()    						{ return 0; }
+	virtual long size()   							{ return 0; }
+	virtual RedisResult::Ptr element(std::size_t i) { return nullptr; }
+	virtual repro::Future<RedisResult::Ptr> parse()	= 0;
+
+	template<class ... Args>
+	repro::Future<RedisResult::Ptr> cmd(Args ... args);
 };
 
 
-
-//////////////////////////////////////////////////////////////
-
-class Redis : public std::enable_shared_from_this<Redis>
+class RedisParser
 {
 public:
 
-	typedef repro::Future<Reply> FutureType;
+	RedisPool::ResourcePtr con;
+	std::string buffer;
+	size_t pos = 0;
 
-	static RedisPtr create(RedisPool& p);
-	static RedisPtr create(RedisPool& p, prio::ThreadPool& tp);
+	RedisParser();
+	~RedisParser();
 
-	Redis(RedisPool& p, prio::ThreadPool& tp);
-	~Redis();
-
-
-    template<class ... Args>
-    FutureType cmd(const Args& ... args)
-    {
-    	v_.clear();
-        populate_args(v_,args...);
-
-        return cmd();
-    }
-
-
-    FutureType cmd(const std::vector<std::string>& v)
-    {
-    	v_ = v;
-        return cmd();
-    }
-
-    FutureType subscribe( const std::string& topic );
-
-    void dispose();
+	repro::Future<RedisResult::Ptr> parse();
+	void listen( repro::Promise<std::pair<std::string,std::string>> p);
+	void consume(size_t n);
 
 private:
 
-	prio::ThreadPool& threadPool_;
-
-    FutureType cmd();
-	void schedule_read(int flags);
-	void schedule_write();
-	void doRead();
-	void doWrite();
+	repro::Promise<RedisResult::Ptr> p_;
+	std::shared_ptr<RedisArrayResult> result_;	
+};
 
 
-    RedisPool& pool_;
-    RedisPool::ResourcePtr ctx_;
-	int done_;
-	bool isSubscription_;
-	std::string topic_;
+class Serializer
+{
+public:
 
-	std::vector<std::string> v_;
-	std::vector<const char*> argv_;
-	std::vector<size_t> arglen_;
+	template<class ... Args>
+	std::string serialize(Args ... args )
+	{
+		const int n = sizeof...(Args);
+		oss_ << "*" << n << "\r\n";
+		do_serialize(args...);
+		std::string r = oss_.str();
 
-	repro::Promise<Reply> promise_;
-	RedisPtr self_;
-	prio::IO io_;
+		oss_.str("");
+		oss_.clear();
+
+		return r;
+	}
+
+private:
+
+	template<class T, class ... Args>
+	void do_serialize(T t,Args ... args )
+	{
+		std::ostringstream tmp_oss_;
+		tmp_oss_ << t;
+		std::string tmp_str = tmp_oss_.str();
+
+		oss_ << "$" << tmp_str.size() << "\r\n" << tmp_str << "\r\n";
+		do_serialize(args...);
+	}
+
+	void do_serialize( )
+	{}
+
+	std::ostringstream oss_;
 };
 
 
 template<class ... Args>
-repro::Future<Reply> RedisPool::cmd(const Args& ... args)
+repro::Future<RedisResult::Ptr> RedisPool::cmd( Args ... args)
 {
-	auto p =  repro::promise<Reply>();
+	auto p =  repro::promise<RedisResult::Ptr>();
 
-	std::vector<std::string> v;
-	populate_args(v,args...);
+	Serializer serializer;
+	std::string cmd = serializer.serialize(args...);
 
-	Redis::create(*this)->cmd(v)
-	.then([p](Reply reply)
+	RedisParser* parser = new RedisParser();
+
+	get()
+	.then([p,cmd,parser](RedisPool::ResourcePtr redis)
 	{
-		p.resolve(std::move(reply));
+		parser->con = redis;
+		return (*(redis))->con->write(cmd);
 	})
-	.otherwise(prio::reject(p));
+	.then([parser](prio::Connection::Ptr con)
+	{
+		return parser->parse();
+	})
+	.then([p,parser](RedisResult::Ptr r)
+	{
+		p.resolve(r);
+		delete parser;
+	})	
+	.otherwise([p,parser](const std::exception& ex)
+	{
+		delete parser;
+		p.reject(ex);
+	});
 
     return p.future();
 }
 
-inline RedisPool::FutureType RedisPool::subscribe( const std::string& topic )
+template<class ... Args>
+repro::Future<RedisResult::Ptr> RedisResult::cmd( Args ... args)
 {
-	auto p =  repro::promise<Reply>();
+	auto p =  repro::promise<RedisResult::Ptr>();
 
-	std::vector<std::string> v;
-	v.push_back("SUBSCRIBE");
-	v.push_back(topic);
+	Serializer serializer;
+	std::string cmd = serializer.serialize(args...);
 
-	Redis::create(*this)->cmd(v)
-	.then([p](Reply reply)
+	RedisParser* parser = new RedisParser();
+
+	parser->con = con;
+	(*(con))->con->write(cmd)
+	.then([parser](prio::Connection::Ptr con)
 	{
-		p.resolve(std::move(reply));
+		return parser->parse();
 	})
-	.otherwise(prio::reject(p));
+	.then([p,parser](RedisResult::Ptr r)
+	{
+		p.resolve(r);
+		delete parser;
+	})	
+	.otherwise([p,parser](const std::exception& ex)
+	{
+		delete parser;
+		p.reject(ex);
+	});
 
     return p.future();
 }
