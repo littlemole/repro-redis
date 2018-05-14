@@ -35,7 +35,7 @@ class BasicTest : public ::testing::Test {
 }; // end test setup
 
 
-
+/*
 #ifdef _RESUMABLE_FUNCTIONS_SUPPORTED
 
 repro::Future<> coroutine_example(reproredis::RedisPool& redis, std::string& result);
@@ -83,7 +83,7 @@ repro::Future<> coroutine_example(reproredis::RedisPool& redis, std::string& res
 }
 
 #endif
-
+*/
 
 
 TEST_F(BasicTest, RawRedis) 
