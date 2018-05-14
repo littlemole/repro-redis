@@ -1,5 +1,5 @@
 # This is a comment
-FROM littlemole/devenv_clangpp_cmake
+FROM littlemole/devenv_gpp_cmake
 MAINTAINER me <little.mole@oha7.org>
 
 # std dependencies
@@ -20,4 +20,5 @@ RUN /usr/local/bin/install.sh prio
 RUN mkdir -p /usr/local/src/repro-redis
 ADD . /usr/local/src/repro-redis
 
-RUN /etc/init.d/redis-server start && SKIPTESTS=true /usr/local/bin/build.sh repro-redis 
+
+RUN /etc/init.d/redis-server start && SKIPTESTS=false /usr/local/bin/build.sh repro-redis 
