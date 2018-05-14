@@ -219,6 +219,10 @@ public:
 			nil_ = true;
 			return prio::resolved(shared_from_this());
 		}
+		if(size_==0)
+		{
+			return prio::resolved(shared_from_this());
+		}
 
 		read()
 		.then([this](RedisResult::Ptr r)
