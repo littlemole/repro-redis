@@ -96,9 +96,9 @@ IF (WIN32)
 
     set(LIBEVENT_LIBRARY ${LIBEVENT_LIBRARIES})
 
-    set(BUILDFLAGS " ${FLAGS}")
+    set(BUILDFLAGS " ${FLAGS} -pthread -D_REENTRANT ")
 
-    set(LIBS debug priocpp optimized priocpp ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${NG2HTTP_LIBRARY} ${HIREDIS_LIBRARIES} ${STDLIB}  )
+    set(LIBS debug priocppd optimized priocpp ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${NG2HTTP_LIBRARY} ${HIREDIS_LIBRARIES} ${STDLIB}  )
 
     set(LIBS debug ${CMAKE_PROJECT_NAME} optimized ${CMAKE_PROJECT_NAME} ${LIBS} )
 
