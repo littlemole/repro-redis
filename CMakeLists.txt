@@ -65,15 +65,13 @@ IF (WIN32)
 
 	find_library(LIBEVENT_LIBRARY NAMES event)
 	find_library(NG2HTTP_LIBRARY NAMES nghttp2)
-	find_library(REDIS_LIBRARY NAMES hiredis)
-	find_library(INTEROP_LIBRARY NAMES Win32_Interop)
-	set(LIBS ${REDIS_LIBRARY} ${INTEROP_LIBRARY} ${NG2HTTP_LIBRARY} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${STDLIB}  )
+	set(LIBS ${NG2HTTP_LIBRARY} ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${STDLIB}  )
 
 	if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
-    	find_library(PRIOCPP_LIBRARY NAMES priocpp.lib)
-    	find_library(PRIOCPPD_LIBRARY NAMES priocppd.lib)
+    		find_library(PRIOCPP_LIBRARY NAMES priocpp.lib)
+    		find_library(PRIOCPPD_LIBRARY NAMES priocppd.lib)
 		set(LIBS ${LIBS} debug ${PRIOCPPD_LIBRARY} optimized  ${PRIOCPP_LIBRARY} )
-    else()
+    	else()
 		find_library(PRIOCPP_LIBRARY NAMES priocpp)
 		set(LIBS ${LIBS} ${PRIOCPP_LIBRARY} )
 	endif()
@@ -90,7 +88,6 @@ IF (WIN32)
     set(OSLIBS "pthread")
 
     find_package(PkgConfig)
-    pkg_check_modules(HIREDIS REQUIRED hiredis)
     pkg_check_modules(PRIOCPP REQUIRED priocpp)
     pkg_check_modules(LIBEVENT REQUIRED libevent_pthreads)
 
@@ -98,7 +95,7 @@ IF (WIN32)
 
     set(BUILDFLAGS " ${FLAGS} -pthread -D_REENTRANT ")
 
-    set(LIBS debug priocppd optimized priocpp ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${NG2HTTP_LIBRARY} ${HIREDIS_LIBRARIES} ${STDLIB}  )
+    set(LIBS debug priocppd optimized priocpp ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${NG2HTTP_LIBRARY} ${STDLIB}  )
 
     set(LIBS debug ${CMAKE_PROJECT_NAME} optimized ${CMAKE_PROJECT_NAME} ${LIBS} )
 

@@ -5,7 +5,6 @@
 #include "priocpp/api.h"
 #include "priocpp/ResourcePool.h"
 #include <set>
-#include <hiredis/hiredis.h>
 
 //////////////////////////////////////////////////////////////
 

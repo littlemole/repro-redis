@@ -1,6 +1,5 @@
 #include <sstream>
 #include <cstring>
-#include <hiredis/hiredis.h>
 #include <priocpp/api.h>
 #include "reproredis/redis.h"
 
