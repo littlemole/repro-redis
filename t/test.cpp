@@ -172,7 +172,7 @@ TEST_F(BasicTest, RawRedisSubscribe)
 		
 
 		sub.subscribe("mytopic")
-		.then([&sub,&result](std::pair<std::string,std::string> msg)
+		.then([&result](std::pair<std::string,std::string> msg)
 		{
 			std::cout  << "msg: " << msg.first << ": " << msg.second << std::endl;
 			result = msg.second;

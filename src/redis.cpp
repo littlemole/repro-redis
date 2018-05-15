@@ -55,6 +55,10 @@ public:
 			nil_ = true;
 			return prio::resolved(shared_from_this());
 		}
+		if(size_==0)
+		{
+			return prio::resolved(shared_from_this());
+		}
 
 		auto p = repro::promise<RedisResult::Ptr>();
 
@@ -112,8 +116,8 @@ class RedisSimpleStringResult : public RedisResult
 {
 public:
 
-	RedisSimpleStringResult(RedisParser& p, std::string s)
-		: str_(s), parser_(p)
+	RedisSimpleStringResult( std::string s)
+		: str_(s)
 	{}
 	
 	virtual std::string str() 		{ return str_; }
@@ -135,7 +139,6 @@ public:
 private:
 
 	std::string str_;	
-	RedisParser& parser_;
 };
 
 
@@ -143,8 +146,8 @@ class RedisErrorResult : public RedisResult
 {
 public:
 
-	RedisErrorResult(RedisParser& p, std::string s)
-		: str_(s), parser_(p)
+	RedisErrorResult(std::string s)
+		: str_(s)
 	{}
 
 	virtual std::string str() 		{ return str_; }
@@ -165,15 +168,14 @@ public:
 
 private:	
 	std::string str_;
-	RedisParser& parser_;
 };
 
 class RedisIntegerResult : public RedisResult
 {
 public:
 
-	RedisIntegerResult(RedisParser& p, std::string s)
-		: str_(s), parser_(p)
+	RedisIntegerResult(std::string s)
+		: str_(s)
 	{}
 	
 	virtual std::string str() 		{ return str_; }
@@ -194,7 +196,6 @@ public:
 		
 private:		
 	std::string str_;
-	RedisParser& parser_;
 };
 
 
@@ -270,17 +271,17 @@ RedisResult::Ptr RedisArrayResult::resultFactory(const std::string& cmd)
 	{
 		case '-' : // error
 		{
-			r = std::make_shared<RedisErrorResult>(parser_,cmd.substr(1));
+			r = std::make_shared<RedisErrorResult>(cmd.substr(1));
 			break;
 		}
 		case '+' : // simple string
 		{
-			r = std::make_shared<RedisSimpleStringResult>(parser_,cmd.substr(1));
+			r = std::make_shared<RedisSimpleStringResult>(cmd.substr(1));
 			break;
 		}
 		case ':' : // simple integer
 		{
-			r = std::make_shared<RedisIntegerResult>(parser_,cmd.substr(1));
+			r = std::make_shared<RedisIntegerResult>(cmd.substr(1));
 			break;
 		}			
 		case '$' : // bulk string
@@ -340,7 +341,7 @@ repro::Future<RedisResult::Ptr> RedisArrayResult::read()
 	{
 		parser_.buffer.append(data);
 		read()
-		.then([this,p](RedisResult::Ptr r)
+		.then([p](RedisResult::Ptr r)
 		{
 			p.resolve(r);
 		})
@@ -375,7 +376,7 @@ repro::Future<RedisResult::Ptr> RedisParser::parse()
 {
 	RedisArrayResult* rar = (RedisArrayResult*)result_.get();
 	rar->parse()
-	.then([this,rar](RedisResult::Ptr r)
+	.then([this](RedisResult::Ptr r)
 	{
 		RedisResult::Ptr res = r->element(0);
 		res->con = con;
@@ -399,7 +400,7 @@ void RedisParser::listen(repro::Promise<std::pair<std::string,std::string>> p )
 	RedisArrayResult* rar = (RedisArrayResult*)result_.get();
 	rar->clear();
 	rar->parse()
-	.then([this,p,rar](RedisResult::Ptr r)
+	.then([this,p](RedisResult::Ptr r)
 	{
 		RedisResult::Ptr res = r->element(0);
 
@@ -454,7 +455,7 @@ repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(con
 	RedisParser* parser = new RedisParser();
 
 	pool_.get()
-	.then([this,cmd,parser](RedisPool::ResourcePtr redis)
+	.then([cmd,parser](RedisPool::ResourcePtr redis)
 	{
 		parser->con = redis;
 		return (*(redis))->con->write(cmd);
