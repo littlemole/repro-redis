@@ -122,6 +122,8 @@ public:
 	void listen( repro::Promise<std::pair<std::string,std::string>> p);
 	void consume(size_t n);
 
+	prio::ConnectionPtr connection() {	return (*con)->con; }
+
 private:
 
 	repro::Promise<RedisResult::Ptr> p_;

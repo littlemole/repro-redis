@@ -97,7 +97,7 @@ void RedisBulkStringResult::parse_response(repro::Promise<RedisResult::Ptr> p)
 
 void RedisBulkStringResult::read(repro::Promise<RedisResult::Ptr> p)
 {
-	(*(parser_.con))->con->read()
+	parser_.connection()->read()
 	.then([this,p](prio::Connection::Ptr con, std::string data)
 	{
 		parser_.buffer.append(data);
@@ -335,7 +335,7 @@ repro::Future<RedisResult::Ptr> RedisArrayResult::read()
 		return p.future();
 	}
 	
-	(*(parser_.con))->con->read()
+	parser_.connection()->read()
 	.then([this,p](prio::Connection::Ptr con, std::string data)
 	{
 		parser_.buffer.append(data);
@@ -443,7 +443,7 @@ RedisSubscriber::~RedisSubscriber()
 
 void RedisSubscriber::unsubscribe()
 {
-	(*(parser_->con))->con->close();
+	parser_->connection()->close();
 }
 
 repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(const std::string& topic)
@@ -457,7 +457,7 @@ repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(con
 	.then([cmd,parser](RedisPool::ResourcePtr redis)
 	{
 		parser->con = redis;
-		return (*(redis))->con->write(cmd);
+		return parser->connection()->write(cmd);
 	})
 	.then([this,parser](prio::Connection::Ptr con)
 	{				
