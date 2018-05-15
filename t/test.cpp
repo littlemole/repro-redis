@@ -160,7 +160,6 @@ TEST_F(BasicTest, RawRedisSubscribe)
 			redis.cmd("publish", "mytopic", "HELO WORLD")
 			.then([](RedisResult::Ptr r)
 			{
-				//std::cout  << "publisher" <<  r->str() << std::endl;
 			})			
 			.otherwise([](const std::exception& ex)
 			{
@@ -192,55 +191,6 @@ TEST_F(BasicTest, RawRedisSubscribe)
 	MOL_TEST_ASSERT_CNTS(0, 0);	
 }
 
-/*
-
-TEST_F(BasicTest, RawRedis) {
-
-	std::string result;
-	{
-		signal(SIGINT).then([](int s) {theLoop().exit(); });
-
-		RedisParser parser;
-		prio::Connection::connect("localhost", 6379)
-		.then([&parser](prio::Connection::Ptr con)
-		{
-			parser.con = con;
-			//return con->write("*1\r\n$4\r\nINFO\r\n");
-			//llen mylist
-			//return con->write("*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n");
-			// rpush mylist XXX
-			//return con->write("*3\r\n$5\r\nRPUSH\r\n$6\r\nmylist\r\n$3\r\nXXX\r\n");
-			// simple str set a b
-			//return con->write("*3\r\n$3\r\nSET\r\n$1\r\na\r\n$1\r\nb\r\n");
-			Serializer serializer;
-			std::string cmd = serializer.serialize("LRANGE", "mylist", 0, -1);
-			return con->write(cmd);
-			//return con->write("*4\r\n$6\r\nLRANGE\r\n$6\r\nmylist\r\n$1\r\n0\r\n$2\r\n-1\r\n");
-			//return con->write("*2\r\n$3\r\nGET\r\n$2\r\naa\r\n");
-			//return con->write("*4\r\n$4\r\nLSET\r\n$6\r\nmylist\r\n$3\r\n777\r\n$2\r\n-1\r\n");
-		})
-		.then([&parser](prio::Connection::Ptr con)
-		{
-			return parser.parse();
-		})
-		.then([](RedisResult* r)
-		{
-			theLoop().exit();
-		})		
-		.otherwise([](const std::exception& ex)
-		{
-			std::cout << ex.what() << std::endl;
-			theLoop().exit();
-		});
-
-		theLoop().run();
-	}
-
-	EXPECT_EQ("promised", result);
-	MOL_TEST_ASSERT_CNTS(0, 0);
-}
-
-*/
 
 int main(int argc, char **argv) {
 
