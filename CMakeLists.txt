@@ -76,7 +76,7 @@ IF (WIN32)
 		set(LIBS ${LIBS} ${PRIOCPP_LIBRARY} )
 	endif()
 
-	set(LIBS ${LIBS} debug ${CMAKE_PROJECT_NAME} optimized ${CMAKE_PROJECT_NAME} )
+	set(LIBS ${LIBS} debug reproredis optimized reproredis )
 
 
 	message("+++++++++++++++++")
