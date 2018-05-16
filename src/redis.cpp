@@ -443,6 +443,7 @@ RedisSubscriber::~RedisSubscriber()
 
 void RedisSubscriber::unsubscribe()
 {
+//	parser_->connection()->cancel();
 	parser_->connection()->close();
 }
 

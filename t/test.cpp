@@ -171,15 +171,26 @@ TEST_F(BasicTest, RawRedisSubscribe)
 		
 
 		sub.subscribe("mytopic")
-		.then([&result](std::pair<std::string,std::string> msg)
+		.then([&sub,&result](std::pair<std::string,std::string> msg)
 		{
 			std::cout  << "msg: " << msg.first << ": " << msg.second << std::endl;
 			result = msg.second;
-			theLoop().exit();
+			sub.unsubscribe(); // will cause a read error
+//			theLoop().exit();
+			timeout([]()
+			{
+			
+				nextTick([]()
+				{
+					theLoop().exit();
+				});
+				
+			},0,500);
+			
 		})			
 		.otherwise([](const std::exception& ex)
 		{
-			std::cout << ex.what() << std::endl;
+			std::cout << "!" << ex.what() << std::endl;
 			theLoop().exit();
 		});
 
