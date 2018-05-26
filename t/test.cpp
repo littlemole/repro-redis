@@ -49,7 +49,16 @@ TEST_F(BasicTest, Coroutine) {
 
 		reproredis::RedisPool Redis("redis://localhost:6379/", 4);
 
-		coroutine_example(Redis,result).then([](){});
+		coroutine_example(Redis, result)
+		.then([]() 
+		{
+			std::cout << "going down" << std::endl;
+
+			timeout([]() {
+				std::cout << "finis" << std::endl;
+				theLoop().exit();
+			}, 1, 0);
+		}).otherwise([](const std::exception& ex) {});
 
 		theLoop().run();
 	}
@@ -67,18 +76,21 @@ repro::Future<> coroutine_example(reproredis::RedisPool& redis, std::string& res
 
 		std::cout << "did set" << std::endl;
 
-		reproredis::RedisResult::Ptr r2 = co_await r->cmd("GET", "promise-test");
+		reproredis::RedisResult::Ptr r2 = co_await redis.cmd("GET", "promise-test");
 
+		std::cout << "did got " << result << std::endl;
 		result = r2->str();
 		std::cout << "did get " << result << std::endl;
 
-		theLoop().exit();
+
 	}
 	catch (const std::exception& ex)
 	{
 		std::cout << "ex:t " << ex.what() << std::endl;
 		theLoop().exit();
 	}
+	std::cout << "coro end" << std::endl;
+
 	co_return;
 }
 

@@ -30,16 +30,9 @@ struct RedisLocator
 {
 	typedef RedisConnection type;
 
-	static repro::Future<type*> retrieve(const std::string& url)
-	{
-		return RedisConnection::connect(url);
-	}
+	static repro::Future<type*> retrieve(const std::string& url);
 
-	static void free( type* t)
-	{
-		t->con->close();
-		delete t;
-	}
+	static void free(type* t);
 };
 
 class RedisPool
@@ -61,6 +54,8 @@ public:
 	void shutdown();
 
 private:
+
+	FutureType do_cmd(const std::string& cmd);
 
 	std::string url_;
 	Pool pool_;
@@ -172,35 +167,10 @@ private:
 template<class ... Args>
 repro::Future<RedisResult::Ptr> RedisPool::cmd( Args ... args)
 {
-	auto p =  repro::promise<RedisResult::Ptr>();
-
 	Serializer serializer;
 	std::string cmd = serializer.serialize(args...);
 
-	RedisParser* parser = new RedisParser();
-
-	get()
-	.then([p,cmd,parser](RedisPool::ResourcePtr redis)
-	{
-		parser->con = redis;
-		return (*(redis))->con->write(cmd);
-	})
-	.then([parser](prio::Connection::Ptr con)
-	{
-		return parser->parse();
-	})
-	.then([p,parser](RedisResult::Ptr r)
-	{
-		p.resolve(r);
-		delete parser;
-	})	
-	.otherwise([p,parser](const std::exception& ex)
-	{
-		delete parser;
-		p.reject(ex);
-	});
-
-    return p.future();
+	return do_cmd(cmd);
 }
 
 template<class ... Args>
