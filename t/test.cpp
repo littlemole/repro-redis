@@ -72,11 +72,13 @@ repro::Future<> coroutine_example(reproredis::RedisPool& redis, std::string& res
 {
 	try
 	{
-		reproredis::RedisResult::Ptr r = co_await redis.cmd("SET", "promise-test", "promised");
+		reproredis::RedisResult::Ptr r;
+		r = co_await redis.cmd("SET", "promise-test", "promised");
 
 		std::cout << "did set" << std::endl;
 
-		reproredis::RedisResult::Ptr r2 = co_await redis.cmd("GET", "promise-test");
+		reproredis::RedisResult::Ptr r2;
+		r2 = co_await redis.cmd("GET", "promise-test");
 
 		std::cout << "did got " << result << std::endl;
 		result = r2->str();
@@ -192,10 +194,10 @@ TEST_F(BasicTest, RawRedisSubscribe)
 			timeout([]()
 			{
 			
-				nextTick([]()
-				{
+				//nextTick([]()
+				//{
 					theLoop().exit();
-				});
+				//});
 				
 			},0,500);
 			

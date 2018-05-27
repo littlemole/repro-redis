@@ -524,7 +524,7 @@ RedisSubscriber::~RedisSubscriber()
 void RedisSubscriber::unsubscribe()
 {
 //	parser_->connection()->cancel();
-	parser_->connection()->close();
+	//parser_->connection()->close();
 }
 
 repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(const std::string& topic)
