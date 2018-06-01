@@ -492,7 +492,7 @@ RedisSubscriber::RedisSubscriber(RedisPool& p)
 
 RedisSubscriber::~RedisSubscriber()
 {
-	unsubscribe();
+	//unsubscribe();
 	shutdown_ = true;
 	p_.future().then([](std::pair<std::string, std::string>) {});
 	p_.future().otherwise([](const std::exception& ex) {});

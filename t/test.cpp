@@ -229,7 +229,7 @@ TEST_F(BasicTest, RawRedisSubscribe)
 		{
 			std::cout  << "msg: " << msg.first << ": " << msg.second << std::endl;
 			result = msg.second;
-			//sub.unsubscribe(); 
+			sub.unsubscribe(); 
 			theLoop().exit();
 			/*
 			timeout([]()
