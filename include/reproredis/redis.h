@@ -67,7 +67,6 @@ class RedisSubscriber
 public:
 
 	RedisPool& pool_;
-	RedisPool::ResourcePtr res_;
 	repro::Promise<std::pair<std::string,std::string>> p_;
 	std::shared_ptr<RedisParser> parser_;
 
@@ -77,6 +76,7 @@ public:
 	repro::Future<std::pair<std::string,std::string>> subscribe(const std::string& topic);
 
 	void unsubscribe();
+	bool shutdown_ = false;
 };
 
 class RedisResult : public std::enable_shared_from_this<RedisResult>
@@ -85,7 +85,7 @@ public:
 
 	typedef std::shared_ptr<RedisResult> Ptr;
 
-	RedisPool::ResourcePtr con;
+	RedisPool* con = nullptr;
 
 	virtual ~RedisResult() {}
 	virtual bool isNill()     						{ return false; }
@@ -114,7 +114,7 @@ public:
 	~RedisParser();
 
 	repro::Future<RedisResult::Ptr> parse();
-	void listen( repro::Promise<std::pair<std::string,std::string>> p);
+	repro::Future<std::pair<std::string, std::string>> listen( bool& shutdown);
 	void consume(size_t n);
 
 	prio::ConnectionPtr connection() {	return (*con)->con; }
@@ -183,8 +183,12 @@ repro::Future<RedisResult::Ptr> RedisResult::cmd( Args ... args)
 
 	RedisParser* parser = new RedisParser();
 
-	parser->con = con;
-	(*(con))->con->write(cmd)
+	con->get()
+	.then([p, cmd, parser](RedisPool::ResourcePtr redis)
+	{
+		parser->con = redis;
+		return (*(parser->con))->con->write(cmd);
+	})
 	.then([parser](prio::Connection::Ptr con)
 	{
 		return parser->parse();

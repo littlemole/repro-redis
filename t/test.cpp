@@ -157,8 +157,7 @@ TEST_F(BasicTest, RawRedisChained)
 	MOL_TEST_ASSERT_CNTS(0, 0);		
 }
 
-
-TEST_F(BasicTest, RawRedisSubscribe) 
+TEST_F(BasicTest, RawRedisChained2)
 {
 	std::string result;
 	{
@@ -166,41 +165,85 @@ TEST_F(BasicTest, RawRedisSubscribe)
 
 		RedisPool redis("redis://localhost:6379");
 
+		redis.cmd("LRANGE", "mylist", 0, -1)
+			.then([&redis](RedisResult::Ptr r)
+		{
+			std::cout << "mylist size:" << r->size() << std::endl;
+			return redis.cmd("INFO");
+		})
+			.then([](RedisResult::Ptr r)
+		{
+			std::cout << "INFO:" << r->str() << std::endl;
+			timeout([]() {
+				theLoop().exit();
+			}, 0, 200);
+		})
+			.otherwise([](const std::exception& ex)
+		{
+			std::cout << ex.what() << std::endl;
+			timeout([]() {
+				theLoop().exit();
+			}, 0, 200);
+		});
+
+		theLoop().run();
+	}
+	MOL_TEST_ASSERT_CNTS(0, 0);
+}
+
+
+TEST_F(BasicTest, RawRedisSubscribe) 
+{
+	std::string result;
+	{
+
+		RedisPool redis("redis://localhost:6379");
+
 		RedisSubscriber sub(redis);
 
+		signal(SIGINT).then([&sub](int s) 
+		{
+			//sub.unsubscribe();
+			theLoop().exit(); 
+		});
 
+		
 		prio::timeout([&redis]()
 		{
+			
 			redis.cmd("publish", "mytopic", "HELO WORLD")
 			.then([](RedisResult::Ptr r)
 			{
+				std::cout << "MSG SEND! " << r->str() << std::endl;
 			})			
 			.otherwise([](const std::exception& ex)
 			{
 				std::cout << ex.what() << std::endl;
 				theLoop().exit();
 			});
+			
 		}
 		,1,0);
 		
-
+		
 		sub.subscribe("mytopic")
 		.then([&sub,&result](std::pair<std::string,std::string> msg)
 		{
 			std::cout  << "msg: " << msg.first << ": " << msg.second << std::endl;
 			result = msg.second;
-			sub.unsubscribe(); // will cause a read error
-//			theLoop().exit();
+			//sub.unsubscribe(); 
+			theLoop().exit();
+			/*
 			timeout([]()
 			{
 			
-				//nextTick([]()
-				//{
+				nextTick([]()
+				{
 					theLoop().exit();
-				//});
+				});
 				
 			},0,500);
-			
+		*/
 		})			
 		.otherwise([](const std::exception& ex)
 		{
@@ -208,7 +251,10 @@ TEST_F(BasicTest, RawRedisSubscribe)
 			theLoop().exit();
 		});
 
+		
+		
 		theLoop().run();
+		//redis.shutdown();
 	}
 
 
