@@ -85,7 +85,7 @@ public:
 
 	typedef std::shared_ptr<RedisResult> Ptr;
 
-	RedisPool* con = nullptr;
+	RedisPool::ResourcePtr con;
 
 	virtual ~RedisResult() {}
 	virtual bool isNill()     						{ return false; }
@@ -182,13 +182,9 @@ repro::Future<RedisResult::Ptr> RedisResult::cmd( Args ... args)
 	std::string cmd = serializer.serialize(args...);
 
 	RedisParser* parser = new RedisParser();
+	parser->con = con;
 
-	con->get()
-	.then([p, cmd, parser](RedisPool::ResourcePtr redis)
-	{
-		parser->con = redis;
-		return (*(parser->con))->con->write(cmd);
-	})
+	(*(parser->con))->con->write(cmd)
 	.then([parser](prio::Connection::Ptr con)
 	{
 		return parser->parse();

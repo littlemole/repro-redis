@@ -14,13 +14,11 @@ namespace reproredis {
 
 repro::Future<RedisLocator::type*> RedisLocator::retrieve(const std::string& url)
 {
-	std::cout << "locate redis" << std::endl;
 	return RedisConnection::connect(url);
 }
 
 void RedisLocator::free(RedisLocator::type* t)
 {
-	std::cout << "dislocate redis" << std::endl;
 	t->con->close();
 	delete t;
 }
@@ -40,7 +38,6 @@ Future<RedisConnection*> RedisConnection::connect(const std::string& url)
 	})
 	.otherwise([p](const std::exception& ex)
 	{
-		std::cout << ex.what() << std::endl;
 		p.reject(ex);
 	});
 	return p.future();
@@ -119,7 +116,6 @@ void RedisBulkStringResult::read(repro::Promise<RedisResult::Ptr> p)
 	})		
 	.otherwise([p](const std::exception& ex)
 	{
-		std::cout << ex.what() << std::endl;
 		p.reject(ex);
 	});			
 }
@@ -218,16 +214,10 @@ public:
 
 	RedisArrayResult(RedisParser& p, long s)
 		:size_(s),parser_(p),p_(repro::promise<RedisResult::Ptr>() )
-	{
-		std::cout << "RedisArrayResult()" << std::endl;
-
-	}
+	{}
 
 	~RedisArrayResult()
-	{
-		std::cout << "~RedisArrayResult()" << std::endl;
-
-	}
+	{}
 	
 	virtual bool isArray()    						 { return true; }
 	virtual bool isNill()     						 { return nil_; }
@@ -243,7 +233,6 @@ public:
 		}
 		if(size_==0)
 		{
-			std::cout << "done 0cnt" << std::endl;
 			return prio::resolved(shared_from_this());
 		}
 
@@ -253,7 +242,6 @@ public:
 		{
 			if(size_ == (long)elements_.size())
 			{
-				std::cout << "finished 0cnt" << std::endl;
 				p_.resolve(shared_from_this());
 				return;
 			}
@@ -261,7 +249,6 @@ public:
 		})		
 		.otherwise([this](const std::exception& ex)
 		{
-			std::cout << ex.what() << std::endl;
 			p_.reject(ex);
 		});	
 		return p_.future();
@@ -359,12 +346,10 @@ repro::Future<RedisResult::Ptr> RedisArrayResult::read()
 		parse_response(tmp,p );
 		return p.future();
 	}
-	//auto tmp = shared_from_this();
 
 	parser_.connection()->read()
 	.then([this,p](prio::Connection::Ptr con, std::string data)
 	{
-		std::cout << "data: " << data << std::endl;
 		parser_.buffer.append(data);
 		read()
 		.then([p](RedisResult::Ptr r)
@@ -373,13 +358,11 @@ repro::Future<RedisResult::Ptr> RedisArrayResult::read()
 		})
 		.otherwise([p](const std::exception& ex)
 		{
-			std::cout << ex.what() << std::endl;
 			p.reject(ex);
 		});			
 	})		
 	.otherwise([p](const std::exception& ex)
 	{
-		std::cout << ex.what() << std::endl;
 		p.reject(ex);
 	});			
 
@@ -391,16 +374,11 @@ repro::Future<RedisResult::Ptr> RedisArrayResult::read()
 RedisParser::RedisParser()
 	: p_ (repro::promise<RedisResult::Ptr>())
 {
-	std::cout << "RedisParser()" << std::endl;
-
 	result_ = std::make_shared<RedisArrayResult>(*this,1);		
 }
 
 RedisParser::~RedisParser()
-{
-	std::cout << "~RedisParser()" << std::endl;
-
-}
+{}
 
 repro::Future<RedisResult::Ptr> RedisParser::parse()
 {
@@ -408,10 +386,8 @@ repro::Future<RedisResult::Ptr> RedisParser::parse()
 	rar->parse()
 	.then([this](RedisResult::Ptr r)
 	{
-		std::cout << "parsed " << r->str() << std::endl;
-
 		RedisResult::Ptr res = r->element(0);
-		//res->con = con;
+		res->con = con;
 		auto tmp = p_;
 
 		tmp.resolve(res);
@@ -419,7 +395,6 @@ repro::Future<RedisResult::Ptr> RedisParser::parse()
 	.otherwise([this](const std::exception& ex)
 	{
 		con->markAsInvalid();
-		std::cout << ex.what() << std::endl;
 		auto tmp = p_;
 		tmp.reject(ex);
 	});	
@@ -445,10 +420,8 @@ RedisPool::FutureType RedisPool::do_cmd(const std::string& cmd)
 	})
 	.then([this,p, parser](RedisResult::Ptr r)
 	{
-		std::cout << "++" << std::endl;
-		r->con = this;
+		r->con = parser->con;
 		p.resolve(r);
-		std::cout << "+++" << std::endl;
 		delete parser;
 	})
 	.otherwise([p, parser](const std::exception& ex)
@@ -496,7 +469,6 @@ repro::Future<std::pair<std::string, std::string>> RedisParser::listen( bool& sh
 	.otherwise([p,this](const std::exception& ex)
 	{
 		con->markAsInvalid();
-		std::cout << ex.what() << std::endl;
 		p.reject(ex);
 	});	
 
@@ -531,7 +503,6 @@ void RedisSubscriber::unsubscribe()
 	parser_->connection()->cancel();
 	parser_->connection()->close();
 	shutdown_ = true;
-	//parser_.reset();
 }
 
 repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(const std::string& topic)
@@ -555,23 +526,28 @@ repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(con
 	})		
 	.then([this,parser](RedisResult::Ptr r)
 	{				
-		
 		if ( r->isError() || r->isNill() || !r->isArray() || r->element(0)->str() != "subscribe" )
 		{
 			throw repro::Ex("redis subscribe failed");
 		}
 
+		auto f = parser_->listen(shutdown_);
 		delete parser;
-		return parser_->listen(shutdown_);
-		//p_.resolve(std::make_pair(std::string("dummy"), std::string("msg")));
-	})	
-	.then([this, parser](std::pair<std::string, std::string> r)
+		return f;
+	})
+	.then([this](std::pair<std::string, std::string> r)
 	{
-		p_.resolve(r);
+		try
+		{
+			p_.resolve(r);
+		}
+		catch (const std::exception& ex)
+		{
+			p_.reject(ex);
+		}
 	})
 	.otherwise([this, parser](const std::exception& ex)
 	{
-		std::cout << ex.what() << std::endl;
 		delete parser;
 		p_.reject(ex);
 	});		
