@@ -4,6 +4,7 @@
 #include "reproredis/redis.h"
 
 using namespace prio;
+using namespace repro;
 
 
 namespace reproredis {
