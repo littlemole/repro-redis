@@ -542,9 +542,9 @@ repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(con
 		{
 			p_.resolve(r);
 		}
-		catch (const std::exception& ex)
+		catch (...)
 		{
-			p_.reject(ex);
+			p_.reject(std::current_exception());
 		}
 	})
 	.otherwise([this, parser](const std::exception& ex)
