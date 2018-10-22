@@ -82,10 +82,10 @@ update-dockerfile:
 	/bin/sed -i "s/FROM .*/FROM ${BASE_IMAGE}/" Dockerfile
 
 image: update-dockerfile## build docker test image
-	docker build -t $(IMAGE) . -fDockerfile  --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND) --build-arg BUILDCHAIN=$(BUILDCHAIN)
+	docker build -t $(IMAGE) . -fDockerfile  --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND) --build-arg BUILDCHAIN=$(BUILDCHAIN) --build-arg TS=$(TS)
 
 clean-image: update-dockerfile ## rebuild the docker test image from scratch
-	docker build -t $(IMAGE) . --no-cache -fDockerfile --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND) --build-arg BUILDCHAIN=$(BUILDCHAIN)
+	docker build -t $(IMAGE) . --no-cache -fDockerfile --build-arg CXX=$(CXX) --build-arg BACKEND=$(BACKEND) --build-arg BUILDCHAIN=$(BUILDCHAIN) --build-arg TS=$(TS)
 		
 bash: rmc image ## run the docker image and open a shell
 	docker run --name $(CONTAINER) -ti $(IMAGE) bash

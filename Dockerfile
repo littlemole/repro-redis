@@ -1,5 +1,5 @@
 # This is a comment
-FROM littlemole/devenv_gpp_make
+FROM littlemole/devenv_clangpp_make
 MAINTAINER me <little.mole@oha7.org>
 
 # std dependencies
@@ -13,6 +13,9 @@ ENV BACKEND=${BACKEND}
 
 ARG BUILDCHAIN=make
 ENV BUILDCHAIN=${BUILDCHAIN}
+
+ARG TS=
+ENV TS=${TS}
 
 RUN /usr/local/bin/install.sh repro 
 RUN /usr/local/bin/install.sh prio 
