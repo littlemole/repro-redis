@@ -116,7 +116,7 @@ set(CMAKE_CXX_FLAGS  		"${CMAKE_CXX_FLAGS} ${BUILDFLAGS}")
 ############################################
 
 
-option(WITH_LIBEVENT "use libevent (default:on)" ON)
+option(WITH_LIBEVENT "use libevent (default:on)" OFF)
 if(WITH_LIBEVENT)
     add_definitions(-DPROMISE_USE_LIBEVENT)    
     set(BACKEND ${LIBEVENT_LIBRARY})
