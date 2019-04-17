@@ -419,7 +419,7 @@ RedisPool::FutureType RedisPool::do_cmd(const std::string& cmd)
 	{
 		return parser->parse();
 	})
-	.then([this,p, parser](RedisResult::Ptr r)
+	.then([p, parser](RedisResult::Ptr r)
 	{
 		r->con = parser->con;
 		p.resolve(r);

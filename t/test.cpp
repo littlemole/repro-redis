@@ -199,9 +199,8 @@ TEST_F(BasicTest, RawRedisSubscribe)
 
 		RedisSubscriber sub(redis);
 
-		signal(SIGINT).then([&sub](int s) 
+		signal(SIGINT).then([](int s) 
 		{
-			//sub.unsubscribe();
 			theLoop().exit(); 
 		});
 
