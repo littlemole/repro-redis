@@ -2,13 +2,13 @@
 DEBUG = -g -DMOL_PROMISE_DEBUG
 release : override DEBUG = -O3
 
-DEFAULT_OPTS = -std=c++14
+DEFAULT_OPTS = -std=c++17
 
 ifneq ($(CXX),g++)
-DEFAULT_OPTS = $(TS) -std=c++14 -stdlib=libc++ -fcoroutines-ts -D_RESUMABLE_FUNCTIONS_SUPPORTED 
+DEFAULT_OPTS = $(TS) -std=c++17 -stdlib=libc++ -fcoroutines-ts -D_RESUMABLE_FUNCTIONS_SUPPORTED 
 endif
 
-OPTIONS = -std=c++14 -pthread -D_REENTRANT $(DEFAULT_OPTS)
+OPTIONS = -pthread -D_REENTRANT $(DEFAULT_OPTS)
 
 PROMISE_IMPL = -DPROMISE_USE_LIBEVENT
 ifeq ($(BACKEND),boost_asio)
