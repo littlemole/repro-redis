@@ -122,6 +122,7 @@ public:
 private:
 
 	repro::Promise<RedisResult::Ptr> p_;
+	repro::Promise<std::pair<std::string, std::string>> p2_;
 	std::shared_ptr<RedisArrayResult> result_;	
 };
 

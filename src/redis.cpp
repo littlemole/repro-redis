@@ -376,10 +376,12 @@ RedisParser::RedisParser()
 	: p_ (repro::promise<RedisResult::Ptr>())
 {
 	result_ = std::make_shared<RedisArrayResult>(*this,1);		
+	p2_ = repro::promise<std::pair<std::string, std::string>>();	
 }
 
 RedisParser::~RedisParser()
-{}
+{
+}
 
 repro::Future<RedisResult::Ptr> RedisParser::parse()
 {
@@ -437,11 +439,10 @@ RedisPool::FutureType RedisPool::do_cmd(const std::string& cmd)
 
 repro::Future<std::pair<std::string, std::string>> RedisParser::listen( bool& shutdown )
 {
-	auto p = repro::promise<std::pair<std::string, std::string>>();
 
 	if (shutdown) 
 	{
-		return p.future();
+		return p2_.future();
 	}
 
 	bool& b = shutdown;
@@ -449,7 +450,7 @@ repro::Future<std::pair<std::string, std::string>> RedisParser::listen( bool& sh
 	RedisArrayResult* rar = (RedisArrayResult*)result_.get();
 	rar->clear();
 	rar->parse()
-	.then([this,p,&b](RedisResult::Ptr r)
+	.then([this,&b](RedisResult::Ptr r)
 	{
 		RedisResult::Ptr res = r->element(0);
 
@@ -461,24 +462,25 @@ repro::Future<std::pair<std::string, std::string>> RedisParser::listen( bool& sh
 		std::string channel = res->element(1)->str();
 		std::string msg     = res->element(2)->str();
 
-		p.resolve(std::make_pair(channel,msg));
+		p2_.resolve(std::make_pair(channel,msg));
 		if (!b)
 		{
 			listen( b);
 		}
 	})		
-	.otherwise([p,this](const std::exception& ex)
+	.otherwise([this](const std::exception& ex)
 	{
 		con->markAsInvalid();
-		p.reject(ex);
+		p2_.reject(ex);
 	});	
 
-	return p.future();
+	return p2_.future();
 }
 
 void RedisParser::consume(size_t n)
 {
 	pos += n;
+	
 }
 
 
