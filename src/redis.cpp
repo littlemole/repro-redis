@@ -452,6 +452,11 @@ repro::Future<std::pair<std::string, std::string>> RedisParser::listen( bool& sh
 	rar->parse()
 	.then([this,&b](RedisResult::Ptr r)
 	{
+		if( r->isError() || r->isNill() || !r->isArray() || r->size() < 1 )
+		{
+			throw repro::Ex("invalid redis channel reply 1");
+		}
+
 		RedisResult::Ptr res = r->element(0);
 
 		if( res->isError() || res->isNill() || !res->isArray() || res->size() < 3 || res->element(0)->str() != "message")
