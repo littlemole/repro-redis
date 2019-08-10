@@ -535,6 +535,7 @@ repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(con
 	})		
 	.otherwise([this, parser](const std::exception& ex)
 	{
+		parser->con->markAsInvalid();
 		delete parser;
 		p_.reject(ex);
 	})	
