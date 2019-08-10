@@ -429,6 +429,7 @@ RedisPool::FutureType RedisPool::do_cmd(const std::string& cmd)
 	})
 	.otherwise([p, parser](const std::exception& ex)
 	{
+		parser->con->markAsInvalid();
 		delete parser;
 		p.reject(ex);
 	});
