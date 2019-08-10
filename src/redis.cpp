@@ -594,7 +594,8 @@ Future<RedisPool::ResourcePtr> RedisPool::get()
 	.then( [p](ResourcePtr r)
 	{
 		p.resolve(r);
-	});
+	})
+	.otherwise( reject(p) );
 	return p.future();
 }
 
