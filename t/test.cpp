@@ -230,17 +230,6 @@ TEST_F(BasicTest, RawRedisSubscribe)
 			result = msg.second;
 			sub.unsubscribe(); 
 			theLoop().exit();
-			/*
-			timeout([]()
-			{
-			
-				nextTick([]()
-				{
-					theLoop().exit();
-				});
-				
-			},0,500);
-		*/
 		})			
 		.otherwise([](const std::exception& ex)
 		{
@@ -248,10 +237,8 @@ TEST_F(BasicTest, RawRedisSubscribe)
 			theLoop().exit();
 		});
 
-		
-		
+			
 		theLoop().run();
-		//redis.shutdown();
 	}
 
 

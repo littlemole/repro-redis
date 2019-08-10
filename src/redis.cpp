@@ -532,10 +532,16 @@ repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(con
 		parser->con->markAsInvalid();
 		return parser->parse();
 	})		
+	.otherwise([this, parser](const std::exception& ex)
+	{
+		delete parser;
+		p_.reject(ex);
+	})	
 	.then([this,parser](RedisResult::Ptr r)
 	{				
 		if ( r->isError() || r->isNill() || !r->isArray() || r->element(0)->str() != "subscribe" )
 		{
+			delete parser;
 			throw repro::Ex("redis subscribe failed");
 		}
 
@@ -556,7 +562,7 @@ repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(con
 	})
 	.otherwise([this, parser](const std::exception& ex)
 	{
-		delete parser;
+//		delete parser;
 		p_.reject(ex);
 	});		
 
