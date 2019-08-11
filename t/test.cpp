@@ -247,6 +247,83 @@ TEST_F(BasicTest, RawRedisSubscribe)
 }
 
 
+
+TEST_F(BasicTest, RawRedisSubscribeTwoMsgs) 
+{
+	std::string result;
+	{
+
+		RedisPool redis("redis://localhost:6379");
+
+		RedisSubscriber sub(redis);
+
+		signal(SIGINT).then([](int s) 
+		{
+			theLoop().exit(); 
+		});
+
+		
+		prio::timeout([&redis]()
+		{
+			
+			redis.cmd("publish", "mytopic", "HELO WORLD1")
+			.then([](RedisResult::Ptr r)
+			{
+				std::cout << "MSG SEND! " << r->str() << std::endl;
+			})			
+			.otherwise([](const std::exception& ex)
+			{
+				std::cout << ex.what() << std::endl;
+				theLoop().exit();
+			});
+			
+		}
+		,1,0);
+				
+		prio::timeout([&redis]()
+		{
+			
+			redis.cmd("publish", "mytopic", "HELO WORLD2")
+			.then([](RedisResult::Ptr r)
+			{
+				std::cout << "MSG SEND! " << r->str() << std::endl;
+			})			
+			.otherwise([](const std::exception& ex)
+			{
+				std::cout << ex.what() << std::endl;
+				theLoop().exit();
+			});
+			
+		}
+		,2,0);
+		
+		sub.subscribe("mytopic")
+		.then([&sub,&result](std::pair<std::string,std::string> msg)
+		{
+			std::cout  << "msg: " << msg.first << ": " << msg.second << std::endl;
+			result += msg.second;
+			if(msg.second == "HELO WORLD2")
+			{
+				sub.unsubscribe(); 
+				theLoop().exit();
+			}
+		})			
+		.otherwise([](const std::exception& ex)
+		{
+			std::cout << "!" << ex.what() << std::endl;
+			theLoop().exit();
+		});
+
+			
+		theLoop().run();
+	}
+
+
+	EXPECT_EQ("HELO WORLD1HELO WORLD2", result);
+	MOL_TEST_ASSERT_CNTS(0, 0);	
+}
+
+
 int main(int argc, char **argv) {
 
 	prio::Libraries<prio::EventLoop> init;

@@ -66,16 +66,17 @@ class RedisSubscriber
 {
 public:
 
-	RedisPool& pool_;
-	repro::Promise<std::pair<std::string,std::string>> p_;
-	std::shared_ptr<RedisParser> parser_;
-
 	RedisSubscriber(RedisPool& p);
 	~RedisSubscriber();
 
 	repro::Future<std::pair<std::string,std::string>> subscribe(const std::string& topic);
 
 	void unsubscribe();
+
+private:
+	RedisPool& pool_;
+	repro::Promise<std::pair<std::string,std::string>> p_;
+	std::shared_ptr<RedisParser> parser_;
 	bool shutdown_ = false;
 };
 
@@ -99,31 +100,9 @@ public:
 
 	template<class ... Args>
 	repro::Future<RedisResult::Ptr> cmd(Args ... args);
-};
-
-
-class RedisParser
-{
-public:
-
-	RedisPool::ResourcePtr con;
-	std::string buffer;
-	size_t pos = 0;
-
-	RedisParser();
-	~RedisParser();
-
-	repro::Future<RedisResult::Ptr> parse();
-	repro::Future<std::pair<std::string, std::string>> listen( bool& shutdown);
-	void consume(size_t n);
-
-	prio::ConnectionPtr connection() {	return (*con)->con; }
 
 private:
-
-	repro::Promise<RedisResult::Ptr> p_;
-	repro::Promise<std::pair<std::string, std::string>> p2_;
-	std::shared_ptr<RedisArrayResult> result_;	
+	repro::Future<RedisResult::Ptr> do_cmd(std::string cmd);	
 };
 
 
@@ -177,31 +156,10 @@ repro::Future<RedisResult::Ptr> RedisPool::cmd( Args ... args)
 template<class ... Args>
 repro::Future<RedisResult::Ptr> RedisResult::cmd( Args ... args)
 {
-	auto p =  repro::promise<RedisResult::Ptr>();
-
 	Serializer serializer;
 	std::string cmd = serializer.serialize(args...);
 
-	RedisParser* parser = new RedisParser();
-	parser->con = con;
-
-	(*(parser->con))->con->write(cmd)
-	.then([parser](prio::Connection::Ptr con)
-	{
-		return parser->parse();
-	})
-	.then([p,parser](RedisResult::Ptr r)
-	{
-		p.resolve(r);
-		delete parser;
-	})	
-	.otherwise([p,parser](const std::exception& ex)
-	{
-		delete parser;
-		p.reject(ex);
-	});
-
-    return p.future();
+	return do_cmd(cmd);
 }
 
 

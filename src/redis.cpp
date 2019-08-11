@@ -45,6 +45,73 @@ Future<RedisConnection*> RedisConnection::connect(const std::string& url)
 }
 
 
+class RedisParser
+{
+public:
+
+	RedisPool::ResourcePtr con;
+	std::string buffer;
+	size_t pos = 0;
+
+	RedisParser();
+	~RedisParser();
+
+	repro::Future<RedisResult::Ptr> parse();
+	repro::Future<std::pair<std::string, std::string>> listen( bool& shutdown);
+	void consume(size_t n);
+
+	prio::ConnectionPtr connection() {	return (*con)->con; }
+
+	repro::Future<RedisResult::Ptr> do_cmd(const std::string& cmd, repro::Promise<RedisResult::Ptr> p)
+	{
+		(*con)->con->write(cmd)
+		.then([this](prio::Connection::Ptr con)
+		{
+			return parse();
+		})
+		.then([this,p](RedisResult::Ptr r)
+		{
+			r->con = con;			
+			p.resolve(r);
+			delete this;
+		})	
+		.otherwise([this,p](const std::exception& ex)
+		{
+			markAsInvalid();
+			p.reject(ex);
+			delete this;
+		});
+
+		return p.future();
+	}
+
+	void markAsInvalid()
+	{
+		if(con)
+		{
+			con->markAsInvalid();
+		}
+	}
+
+private:
+
+	repro::Promise<RedisResult::Ptr> p_;
+	repro::Promise<std::pair<std::string, std::string>> p2_;
+	std::shared_ptr<RedisArrayResult> result_;	
+};
+
+
+repro::Future<RedisResult::Ptr> RedisResult::do_cmd(std::string cmd)
+{
+	auto p =  repro::promise<RedisResult::Ptr>();
+
+	RedisParser* parser = new RedisParser();
+	parser->con = con;
+
+	return parser->do_cmd(cmd,p);
+
+}
+
 
 class RedisBulkStringResult : public RedisResult
 {
@@ -372,6 +439,7 @@ repro::Future<RedisResult::Ptr> RedisArrayResult::read()
 
 
 
+
 RedisParser::RedisParser()
 	: p_ (repro::promise<RedisResult::Ptr>())
 {
@@ -397,7 +465,7 @@ repro::Future<RedisResult::Ptr> RedisParser::parse()
 	})		
 	.otherwise([this](const std::exception& ex)
 	{
-		con->markAsInvalid();
+		markAsInvalid();
 		auto tmp = p_;
 		tmp.reject(ex);
 	});	
@@ -415,24 +483,11 @@ RedisPool::FutureType RedisPool::do_cmd(const std::string& cmd)
 	.then([p, cmd, parser](RedisPool::ResourcePtr redis)
 	{
 		parser->con = redis;
-		return (*(redis))->con->write(cmd);
-	})
-	.then([parser](prio::Connection::Ptr con)
-	{
-		return parser->parse();
-	})
-	.then([p, parser](RedisResult::Ptr r)
-	{
-		r->con = parser->con;
-		p.resolve(r);
-		delete parser;
+		parser->do_cmd(cmd,p);
 	})
 	.otherwise([p, parser](const std::exception& ex)
 	{
-		if(parser->con)
-		{
-			parser->con->markAsInvalid();
-		}
+		parser->markAsInvalid();
 		delete parser;
 		p.reject(ex);
 	});
@@ -479,7 +534,7 @@ repro::Future<std::pair<std::string, std::string>> RedisParser::listen( bool& sh
 	})		
 	.otherwise([this](const std::exception& ex)
 	{
-		con->markAsInvalid();
+		markAsInvalid();
 		p2_.reject(ex);
 	});	
 
@@ -533,15 +588,12 @@ repro::Future<std::pair<std::string,std::string>> RedisSubscriber::subscribe(con
 	.then([this,parser](prio::Connection::Ptr con)
 	{				
 		parser_->con = parser->con;
-		parser->con->markAsInvalid();
+		parser->markAsInvalid();
 		return parser->parse();
 	})		
 	.otherwise([this, parser](const std::exception& ex)
 	{
-		if(parser->con)
-		{
-			parser->con->markAsInvalid();
-		}
+		parser->markAsInvalid();
 		delete parser;
 		p_.reject(ex);
 	})	
