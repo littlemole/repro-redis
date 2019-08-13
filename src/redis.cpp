@@ -559,16 +559,19 @@ RedisSubscriber::RedisSubscriber(RedisPool& p)
 
 RedisSubscriber::~RedisSubscriber()
 {
-	//unsubscribe();
-	shutdown_ = true;
+	unsubscribe();
+	//shutdown_ = true;
 	p_.future().then([](std::pair<std::string, std::string>) {});
 	p_.future().otherwise([](const std::exception& ex) {});
 }
 
 void RedisSubscriber::unsubscribe()
 {
-	parser_->connection()->cancel();
-	parser_->connection()->close();
+	if(parser_->con && parser_->con->valid())
+	{
+		parser_->connection()->cancel();
+		parser_->connection()->close();
+	}
 	shutdown_ = true;
 }
 
