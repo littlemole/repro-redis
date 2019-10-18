@@ -6,7 +6,7 @@
 #include <string>
 #include <exception>
 #include <functional>
-#include "test.h"
+#include "reprocpp/test.h"
 #include "priocpp/api.h"
 #include "priocpp/task.h"
 #include <signal.h>

@@ -66,6 +66,8 @@ class RedisSubscriber
 {
 public:
 
+	LITTLE_MOLE_MONITOR(RedisSubscribers);
+
 	RedisSubscriber(RedisPool& p);
 	~RedisSubscriber();
 
@@ -83,6 +85,9 @@ private:
 class RedisResult : public std::enable_shared_from_this<RedisResult>
 {
 public:
+
+	LITTLE_MOLE_MONITOR(RedisResults);
+
 
 	typedef std::shared_ptr<RedisResult> Ptr;
 
