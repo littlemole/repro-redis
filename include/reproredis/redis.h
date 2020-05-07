@@ -3,7 +3,7 @@
 
 #include "priocpp/common.h"
 #include "priocpp/api.h"
-#include "priocpp/ResourcePool.h"
+#include "priocpp/res.h"
 #include <set>
 
 //////////////////////////////////////////////////////////////
@@ -28,18 +28,18 @@ public:
 
 struct RedisLocator
 {
-	typedef RedisConnection type;
+	typedef RedisConnection* type;
 
-	static repro::Future<type*> retrieve(const std::string& url);
+	static repro::Future<type> retrieve(const std::string& url);
 
-	static void free(type* t);
+	static void free(type t);
 };
 
 class RedisPool
 {
 public:
 	typedef repro::Future<std::shared_ptr<RedisResult>> FutureType;
-	typedef prio::ResourcePool<RedisLocator> Pool;
+	typedef prio::Resource::Pool<RedisLocator> Pool;
 	typedef Pool::ResourcePtr ResourcePtr;
 
 	RedisPool(const std::string& url, int capacity = 4);
@@ -66,18 +66,16 @@ class RedisSubscriber
 {
 public:
 
-	LITTLE_MOLE_MONITOR(RedisSubscribers);
-
 	RedisSubscriber(RedisPool& p);
 	~RedisSubscriber();
 
-	repro::Future<std::pair<std::string,std::string>> subscribe(const std::string& topic);
+	prio::Callback<std::pair<std::string,std::string>>& subscribe(const std::string& topic);
 
 	void unsubscribe();
 
 private:
 	RedisPool& pool_;
-	repro::Promise<std::pair<std::string,std::string>> p_;
+	prio::Callback<std::pair<std::string,std::string>> cb_;
 	std::shared_ptr<RedisParser> parser_;
 	bool shutdown_ = false;
 };
@@ -86,14 +84,32 @@ class RedisResult : public std::enable_shared_from_this<RedisResult>
 {
 public:
 
-	LITTLE_MOLE_MONITOR(RedisResults);
-
-
 	typedef std::shared_ptr<RedisResult> Ptr;
 
 	RedisPool::ResourcePtr con;
+	
+	RedisResult()
+	{
+		REPRO_MONITOR_INCR(RedisResult);	
+	}
 
-	virtual ~RedisResult() {}
+	RedisResult(const RedisResult& rhs)
+		: con(rhs.con)
+	{
+		REPRO_MONITOR_INCR(RedisResult);	
+	}
+
+	RedisResult(RedisResult&& rhs)
+		: con(std::move(rhs.con))
+	{
+		REPRO_MONITOR_INCR(RedisResult);	
+	}
+
+	virtual ~RedisResult() 
+	{
+		REPRO_MONITOR_DECR(RedisResult);
+	}
+	
 	virtual bool isNill()     						{ return false; }
 	virtual bool isError()    						{ return false; }
 	virtual bool isArray()    						{ return false; }
@@ -107,6 +123,9 @@ public:
 	repro::Future<RedisResult::Ptr> cmd(Args ... args);
 
 private:
+	RedisResult& operator=(const RedisResult&) = delete;
+	RedisResult& operator=(RedisResult&&) = delete;
+	
 	repro::Future<RedisResult::Ptr> do_cmd(std::string cmd);	
 };
 

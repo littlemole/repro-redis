@@ -230,13 +230,7 @@ TEST_F(BasicTest, RawRedisSubscribe)
 			result = msg.second;
 			sub.unsubscribe(); 
 			theLoop().exit();
-		})			
-		.otherwise([](const std::exception& ex)
-		{
-			std::cout << "!" << ex.what() << std::endl;
-			theLoop().exit();
-		});
-
+		});	
 			
 		theLoop().run();
 	}
@@ -307,13 +301,7 @@ TEST_F(BasicTest, RawRedisSubscribeTwoMsgs)
 				sub.unsubscribe(); 
 				theLoop().exit();
 			}
-		})			
-		.otherwise([](const std::exception& ex)
-		{
-			std::cout << "!" << ex.what() << std::endl;
-			theLoop().exit();
 		});
-
 			
 		theLoop().run();
 	}
