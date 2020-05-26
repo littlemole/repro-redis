@@ -98,13 +98,14 @@ public:
 	{
 		REPRO_MONITOR_INCR(RedisResult);	
 	}
+/*
 
 	RedisResult(RedisResult&& rhs)
 		: con(std::move(rhs.con))
 	{
 		REPRO_MONITOR_INCR(RedisResult);	
 	}
-
+*/
 	virtual ~RedisResult() 
 	{
 		REPRO_MONITOR_DECR(RedisResult);
