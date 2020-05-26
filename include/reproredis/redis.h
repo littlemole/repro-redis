@@ -20,9 +20,23 @@ class RedisConnection
 {
 public:
 
+	RedisConnection()
+	{
+		REPRO_MONITOR_INCR(RedisConnection);	
+	}
+
+	~RedisConnection()
+	{
+		REPRO_MONITOR_DECR(RedisConnection);	
+	}
+
 	prio::Connection::Ptr con;
 
 	static repro::Future<RedisConnection*> connect(const std::string& url);
+
+private:
+	RedisConnection(const RedisConnection&) = delete;
+	RedisConnection& operator=(const RedisConnection&) = delete;
 };
 
 
