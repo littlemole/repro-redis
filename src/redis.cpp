@@ -569,8 +569,8 @@ RedisSubscriber::~RedisSubscriber()
 
 void RedisSubscriber::unsubscribe()
 {
-	if(parser_->con && 
-	 !::prio::Resource::InvalidResources<RedisConnection*>::is_invalid(parser_->con.get()))
+	if(parser_->con )//&& 
+//	 !::prio::Resource::InvalidResources<RedisConnection*>::is_invalid(parser_->con.get()))
 	//parser_->con->valid())
 	{
 		parser_->connection()->cancel();
