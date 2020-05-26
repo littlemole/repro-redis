@@ -295,17 +295,13 @@ public:
 
 	virtual Future<RedisResult::Ptr> parse()
 	{
-		std::cout << "RA parse" << std::endl;
-
 		if(size_==-1)
 		{
-			std::cout << "RA: size_==-1" << std::endl;
 			nil_ = true;
 			return p_.resolved(shared_from_this());
 		}
 		if(size_==0)
 		{
-			std::cout << "RA: size_== 0" << std::endl;
 			return p_.resolved(shared_from_this());
 		}
 
@@ -315,7 +311,6 @@ public:
 		{
 			if(size_ == (long)elements_.size())
 			{
-				std::cout << "RA: size_== " << size_ << std::endl;
 				p_.resolve(shared_from_this());
 				return;
 			}
@@ -519,7 +514,6 @@ void RedisParser::listen( bool& shutdown, prio::Callback<std::pair<std::string, 
 	{
 		if(!r || r->isError() || r->isNill() || !r->isArray() || r->size() < 1 )
 		{
-			std::cout << (bool)(!r) << std::endl;// << " " << r->isError() << " " <<  r->isNill() << " :: " << r->str() << std::endl;
 			throw repro::Ex("invalid redis channel reply 1");
 		}
 
@@ -527,7 +521,6 @@ void RedisParser::listen( bool& shutdown, prio::Callback<std::pair<std::string, 
 
 		if( res->isError() || res->isNill() || !res->isArray() || res->size() < 3 || res->element(0)->str() != "message")
 		{
-			std::cout << (bool)(!r) << " " << r->isError() << " " <<  r->isNill() << " :: " << r->str() << std::endl;
 			throw repro::Ex("invalid redis channel reply");
 		}
 
@@ -557,23 +550,18 @@ RedisSubscriber::RedisSubscriber(RedisPool& p)
 	: pool_(p)
 {
 	parser_ = std::make_shared<RedisParser>();
-	std::cout << "RedisSubscriber()" << std::endl;
 	REPRO_MONITOR_INCR(RedisSubscriber);	
 }
 
 RedisSubscriber::~RedisSubscriber()
 {
-	std::cout << "~RedisSubscriber()" << std::endl;
-	//unsubscribe();
 	shutdown_ = true;
 	REPRO_MONITOR_DECR(RedisSubscriber);	
 }
 
 void RedisSubscriber::unsubscribe()
 {
-	if(parser_->con )//&& 
-//	 !::prio::Resource::InvalidResources<RedisConnection*>::is_invalid(parser_->con.get()))
-	//parser_->con->valid())
+	if(parser_->con )
 	{
 		parser_->connection()->cancel();
 		parser_->connection()->close();
@@ -592,51 +580,28 @@ prio::Callback<std::pair<std::string,std::string>>& RedisSubscriber::subscribe(c
 	pool_.get_new()
 	.then([cmd,parser](RedisPool::ResourcePtr redis)
 	{
-		std::cout << "Subscriber got connection" << std::endl;
 		parser->con = redis;
 		return parser->connection()->write(cmd);
 	})
 	.then([this,parser](prio::Connection::Ptr con)
 	{				
-		std::cout << "Subscriber got sunscription response" << std::endl;
-		parser_->con = parser->con;
-		//parser->markAsInvalid();
-		
+		parser_->con = parser->con;		
 		return parser->parse();
 	})
 	.then([this,parser](RedisResult::Ptr r)
 	{				
-		std::cout << "Subscribe parsed response" << std::endl;
 		if ( r->isError() || r->isNill() || !r->isArray() || r->element(0)->str() != "subscribe" )
 		{
 			delete parser;
 			throw repro::Ex("redis subscribe failed");
 		}
 
-		std::cout << "Subscribe start listening" << std::endl;
 		parser_->listen(shutdown_,cb_);
 		delete parser;
 	})
-	/*
-		.otherwise([this, parser](const std::exception_ptr& eptr)
-		{
-			try {
-				std::rethrow_exception(eptr);
-			}
-			catch(const std::exception& ex)
-			{
-				std::cout << "!!!" << ex.what() << std::endl;
-			}
-			cb_.reject(eptr);
-			//parser->markAsInvalid();
-			//delete parser;
-		});		
-	})	
-	*/	
 	.otherwise([this, parser](const std::exception_ptr& eptr)
 	{
 		cb_.reject(eptr);
-		//parser->markAsInvalid();
 		delete parser;
 	});
 
