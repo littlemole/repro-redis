@@ -507,6 +507,8 @@ RedisPool::FutureType RedisPool::do_cmd(const std::string& cmd)
 repro::Future<std::pair<std::string, std::string>> RedisParser::listen( bool& shutdown )
 {
 
+//	p2_ = repro::promise<std::pair<std::string, std::string>>();
+
 	if (shutdown) 
 	{
 		return p2_.future();
@@ -578,8 +580,8 @@ void RedisSubscriber::unsubscribe()
 	 !::prio::Resource::InvalidResources<RedisConnection*>::is_invalid(parser_->con.get()))
 	//parser_->con->valid())
 	{
-		parser_->connection()->cancel();
-		parser_->connection()->close();
+//		parser_->connection()->cancel();
+//		parser_->connection()->close();
 	}
 	shutdown_ = true;
 }
