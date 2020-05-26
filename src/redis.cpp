@@ -590,11 +590,13 @@ prio::Callback<std::pair<std::string,std::string>>& RedisSubscriber::subscribe(c
 	pool_.get()
 	.then([cmd,parser](RedisPool::ResourcePtr redis)
 	{
+		std::cout << "Subscriber got connection" << std::endl;
 		parser->con = redis;
 		return parser->connection()->write(cmd);
 	})
 	.then([this,parser](prio::Connection::Ptr con)
 	{				
+		std::cout << "Subscriber got sunscription response" << std::endl;
 		parser_->con = parser->con;
 		parser->markAsInvalid();
 		
@@ -602,12 +604,14 @@ prio::Callback<std::pair<std::string,std::string>>& RedisSubscriber::subscribe(c
 	})
 	.then([this,parser](RedisResult::Ptr r)
 	{				
+		std::cout << "Subscribe parsed response" << std::endl;
 		if ( r->isError() || r->isNill() || !r->isArray() || r->element(0)->str() != "subscribe" )
 		{
 			delete parser;
 			throw repro::Ex("redis subscribe failed");
 		}
 
+		std::cout << "Subscribe start listening" << std::endl;
 		parser_->listen(shutdown_,cb_);
 		delete parser;
 	})
