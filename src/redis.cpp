@@ -681,7 +681,7 @@ Future<RedisPool::ResourcePtr> RedisPool::get_new()
 	{
 		p.resolve(std::shared_ptr<RedisConnection>(rc,[](RedisConnection* rc) 
 		{ 
-			InvalidResources<RedisConnection+>::revoke(rc);
+			prio::Resource::InvalidResources<RedisConnection*>::revoke(rc);
 			RedisLocator::free(rc); 
 		} ));
 	})
