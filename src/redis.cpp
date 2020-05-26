@@ -451,10 +451,12 @@ RedisParser::RedisParser()
 	: p_ (repro::promise<RedisResult::Ptr>())
 {
 	result_ = std::make_shared<RedisArrayResult>(*this,1);		
+	REPRO_MONITOR_INCR(RedisParser);		
 }
 
 RedisParser::~RedisParser()
 {
+	REPRO_MONITOR_DECR(RedisParser);		
 }
 
 repro::Future<RedisResult::Ptr> RedisParser::parse()
@@ -537,7 +539,7 @@ void RedisParser::listen( bool& shutdown, prio::Callback<std::pair<std::string, 
 	})		
 	.otherwise([this,&cb](const std::exception_ptr& ex)
 	{
-		markAsInvalid();
+		//markAsInvalid();
 		cb.reject(ex);
 	});	
 }
@@ -587,7 +589,7 @@ prio::Callback<std::pair<std::string,std::string>>& RedisSubscriber::subscribe(c
 
 	RedisParser* parser = new RedisParser();
 
-	pool_.get()
+	pool_.get_new()
 	.then([cmd,parser](RedisPool::ResourcePtr redis)
 	{
 		std::cout << "Subscriber got connection" << std::endl;
@@ -598,7 +600,7 @@ prio::Callback<std::pair<std::string,std::string>>& RedisSubscriber::subscribe(c
 	{				
 		std::cout << "Subscriber got sunscription response" << std::endl;
 		parser_->con = parser->con;
-		parser->markAsInvalid();
+		//parser->markAsInvalid();
 		
 		return parser->parse();
 	})
@@ -634,7 +636,7 @@ prio::Callback<std::pair<std::string,std::string>>& RedisSubscriber::subscribe(c
 	.otherwise([this, parser](const std::exception_ptr& eptr)
 	{
 		cb_.reject(eptr);
-		parser->markAsInvalid();
+		//parser->markAsInvalid();
 		delete parser;
 	});
 
@@ -664,6 +666,24 @@ Future<RedisPool::ResourcePtr> RedisPool::get()
 	.then( [p](ResourcePtr r)
 	{
 		p.resolve(r);
+	})
+	.otherwise( reject(p) );
+	return p.future();
+}
+
+
+Future<RedisPool::ResourcePtr> RedisPool::get_new()
+{
+	auto p = repro::promise<ResourcePtr>();
+
+	RedisLocator::retrieve(url_)
+	.then( [p](RedisConnection* rc)
+	{
+		p.resolve(std::shared_ptr<RedisConnection>(rc,[](RedisConnection* rc) 
+		{ 
+			InvalidResources<RedisConnection+>::revoke(rc);
+			RedisLocator::free(rc); 
+		} ));
 	})
 	.otherwise( reject(p) );
 	return p.future();

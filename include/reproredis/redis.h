@@ -62,6 +62,8 @@ public:
 
 	repro::Future<ResourcePtr> get();
 
+	repro::Future<ResourcePtr> get_new();
+
     template<class ... Args>
 	FutureType cmd( Args ... args);
 
