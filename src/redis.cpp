@@ -555,12 +555,16 @@ RedisSubscriber::RedisSubscriber(RedisPool& p)
 	: pool_(p)
 {
 	parser_ = std::make_shared<RedisParser>();
+	std::cout << "RedisSubscriber()" << std::endl;
+	REPRO_MONITOR_INCR(RedisSubscriber);	
 }
 
 RedisSubscriber::~RedisSubscriber()
 {
+	std::cout << "~RedisSubscriber()" << std::endl;
 	//unsubscribe();
-	//shutdown_ = true;
+	shutdown_ = true;
+	REPRO_MONITOR_DECR(RedisSubscriber);	
 }
 
 void RedisSubscriber::unsubscribe()
