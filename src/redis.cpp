@@ -37,7 +37,7 @@ Future<RedisConnection*> RedisConnection::connect(const std::string& url)
 		rc->con = con;
 		p.resolve(rc);
 	})
-	.otherwise([p](const std::exception& ex)
+	.otherwise([p](const std::exception_ptr& ex)
 	{
 		p.reject(ex);
 	});
@@ -75,7 +75,7 @@ public:
 			p.resolve(r);
 			delete this;
 		})	
-		.otherwise([this,p](const std::exception& ex)
+		.otherwise([this,p](const std::exception_ptr& ex)
 		{
 			markAsInvalid();
 			p.reject(ex);
@@ -184,7 +184,7 @@ void RedisBulkStringResult::read(repro::Promise<RedisResult::Ptr> p)
 		parser_.buffer.append(data);
 		parse_response(p);
 	})		
-	.otherwise([p](const std::exception& ex)
+	.otherwise([p](const std::exception_ptr& ex)
 	{
 		p.reject(ex);
 	});			
@@ -317,7 +317,7 @@ public:
 			}
 			parse();
 		})		
-		.otherwise([this](const std::exception& ex)
+		.otherwise([this](const std::exception_ptr& ex)
 		{
 			p_.reject(ex);
 		});	
@@ -397,7 +397,7 @@ void RedisArrayResult::parse_response( std::string cmd, repro::Promise<RedisResu
 	{
 		p.resolve(r);					
 	})
-	.otherwise([p](const std::exception& ex)
+	.otherwise([p](const std::exception_ptr& ex)
 	{
 		p.reject(ex);
 	});
@@ -426,12 +426,12 @@ repro::Future<RedisResult::Ptr> RedisArrayResult::read()
 		{
 			p.resolve(r);
 		})
-		.otherwise([p](const std::exception& ex)
+		.otherwise([p](const std::exception_ptr& ex)
 		{
 			p.reject(ex);
 		});			
 	})		
-	.otherwise([p](const std::exception& ex)
+	.otherwise([p](const std::exception_ptr& ex)
 	{
 		p.reject(ex);
 	});			
@@ -465,7 +465,7 @@ repro::Future<RedisResult::Ptr> RedisParser::parse()
 
 		tmp.resolve(res);
 	})		
-	.otherwise([this](const std::exception& ex)
+	.otherwise([this](const std::exception_ptr& ex)
 	{
 		markAsInvalid();
 		auto tmp = p_;
@@ -487,7 +487,7 @@ RedisPool::FutureType RedisPool::do_cmd(const std::string& cmd)
 		parser->con = redis;
 		parser->do_cmd(cmd,p);
 	})
-	.otherwise([p, parser](const std::exception& ex)
+	.otherwise([p, parser](const std::exception_ptr& ex)
 	{
 		parser->markAsInvalid();
 		delete parser;
@@ -534,7 +534,7 @@ repro::Future<std::pair<std::string, std::string>> RedisParser::listen( bool& sh
 			listen( b);
 		}
 	})		
-	.otherwise([this](const std::exception& ex)
+	.otherwise([this](const std::exception_ptr& ex)
 	{
 		markAsInvalid();
 		p2_.reject(ex);

@@ -244,9 +244,11 @@ TEST_F(BasicTest, RawRedisSubscribe)
 
 TEST_F(BasicTest, RawRedisSubscribeTwoMsgs) 
 {
+	int s=20;
+	int c=0;
+	
 	std::string result;
 	{
-
 		RedisPool redis("redis://localhost:6379");
 
 		RedisSubscriber sub(redis);
@@ -256,47 +258,33 @@ TEST_F(BasicTest, RawRedisSubscribeTwoMsgs)
 			theLoop().exit(); 
 		});
 
-		
-		prio::timeout([&redis]()
+		for ( int i =0; i < s; i++ )
 		{
-			
-			redis.cmd("publish", "mytopic", "HELO WORLD1")
-			.then([](RedisResult::Ptr r)
+			prio::timeout([&redis]()
 			{
-				std::cout << "MSG SEND! " << r->str() << std::endl;
-			})			
-			.otherwise([](const std::exception& ex)
-			{
-				std::cout << ex.what() << std::endl;
-				theLoop().exit();
-			});
-			
-		}
-		,1,0);
 				
-		prio::timeout([&redis]()
-		{
-			
-			redis.cmd("publish", "mytopic", "HELO WORLD2")
-			.then([](RedisResult::Ptr r)
-			{
-				std::cout << "MSG SEND! " << r->str() << std::endl;
-			})			
-			.otherwise([](const std::exception& ex)
-			{
-				std::cout << ex.what() << std::endl;
-				theLoop().exit();
-			});
-			
+				redis.cmd("publish", "mytopic", "HELO WORLD1")
+				.then([](RedisResult::Ptr r)
+				{
+					std::cout << "MSG SEND! " << r->str() << std::endl;
+				})			
+				.otherwise([](const std::exception& ex)
+				{
+					std::cout << ex.what() << std::endl;
+					theLoop().exit();
+				});
+				
+			}
+			,i+2,0);
 		}
-		,2,0);
-		
+						
 		sub.subscribe("mytopic")
-		.then([&sub,&result](std::pair<std::string,std::string> msg)
+		.then([&c,s,&sub,&result](std::pair<std::string,std::string> msg)
 		{
-			std::cout  << "msg: " << msg.first << ": " << msg.second << std::endl;
+			c++;
+			std::cout  << "msg: " << c << " " << msg.first << ": " << msg.second << std::endl;
 			result += msg.second;
-			if(msg.second == "HELO WORLD2")
+			if(c==s)
 			{
 				sub.unsubscribe(); 
 				theLoop().exit();
@@ -307,7 +295,7 @@ TEST_F(BasicTest, RawRedisSubscribeTwoMsgs)
 	}
 
 
-	EXPECT_EQ("HELO WORLD1HELO WORLD2", result);
+	EXPECT_EQ(c,s);
 	MOL_TEST_ASSERT_CNTS(0, 0);	
 }
 
