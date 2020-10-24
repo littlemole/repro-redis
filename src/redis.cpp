@@ -90,7 +90,6 @@ public:
 		if(con)
 		{
 			prio::Resource::invalidate(con);
-//			con->markAsInvalid();
 		}
 	}
 
@@ -532,7 +531,6 @@ void RedisParser::listen( bool& shutdown, prio::Callback<std::pair<std::string, 
 	})		
 	.otherwise([this,&cb](const std::exception_ptr& ex)
 	{
-		//markAsInvalid();
 		cb.reject(ex);
 	});	
 }
